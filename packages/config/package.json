@@ -1,0 +1,12 @@
+{
+  "name": "@myc/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared tooling configuration for MYC workspaces.",
+  "exports": {
+    "./tsconfig/base.json": "./typescript/base.json",
+    "./tsconfig/library.json": "./typescript/library.json",
+    "./eslint/import-order": "./eslint/import-order.mjs",
+    "./eslint/no-privileged-env": "./eslint/no-privileged-env.mjs"
+  }
+}

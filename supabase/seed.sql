@@ -1,0 +1,2 @@
+-- Local development seed data, applied by `supabase db reset` after migrations.
+-- Intentionally empty until the MYC schema exists.

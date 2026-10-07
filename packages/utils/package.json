@@ -1,0 +1,16 @@
+{
+  "name": "@myc/utils",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-agnostic utilities shared by MYC clients.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@myc/config": "*"
+  }
+}
