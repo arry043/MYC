@@ -25,9 +25,9 @@ Yes. I’d divide **Phase 1 into small, independently testable tasks** so you ca
 ```text
 PHASE 1
 │
-├── 01. Project Foundation
-├── 02. Supabase Foundation
-├── 03. Design System & App Shell
+├── 01. Project Foundation          ✅
+├── 02. Supabase Foundation         ✅
+├── 03. Design System & App Shell   ✅
 ├── 04. Authentication
 ├── 05. User Profile & Onboarding
 ├── 06. First Commitment + "I COMMIT"
@@ -88,9 +88,13 @@ Already your first task.
 
 ---
 
-## 03 — Design System & App Shell
+## 03 — Design System & App Shell ✅
 
 Create the actual MYC visual foundation.
+
+_Done:_ tokens and components (see [ARCHITECTURE.md §4](ARCHITECTURE.md#4-web--appsweb)),
+responsive shell, placeholder pages with static sample content from
+`apps/web/src/lib/sample-data.ts` (D-18), dev-only gallery at `/dev/ui`.
 
 **Implement:**
 
