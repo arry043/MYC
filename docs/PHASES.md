@@ -32,11 +32,12 @@ PHASE 1
 ├── 05. User Profile & Onboarding   ✅
 ├── 06. First Commitment + "I COMMIT" ✅
 ├── 07. Commitment Management       ✅
-├── 08. Daily Completion System
-├── 09. Streak Engine
-├── 10. MYC Calendar — Year
-├── 11. MYC Calendar — Month/Week/Day
-├── 12. Analytics Dashboard
+├── 08. Daily Completion System     ✅
+├── 09. Streak Engine               ✅
+├── 10. MYC Calendar — Year         ✅
+├── 11. MYC Calendar — Month/Week/Day ✅
+├── 12. Analytics Dashboard         ✅
+├── Fix. Immutable Completions, Notes & Realtime ✅
 ├── 13. PWA
 ├── 14. Android App
 ├── 15. Android Widget
@@ -337,9 +338,9 @@ _Done:_
 
 ---
 
-# 10 — MYC Calendar — Year View
+# 10 — MYC Calendar — Year View ✅
 
-Now build the **main MYC calendar**.
+Build the **main MYC calendar**.
 
 Requirements:
 
@@ -351,34 +352,24 @@ Requirements:
 - Hover/click details
 - Year navigation
 
-Example:
+_Done:_
 
-```text
-MYC — 2026
-
-Oct
-
-▣ ▣ ▢ ▣ ▣ ▣ ▣
-▣ ▣ ▣ ▢ ▣ ▣ ▣
-```
+- Contribution-style Year Calendar in `apps/web/src/app/(app)/calendar/_components/year-calendar.tsx`:
+  - 12-month responsive grid with weekday labels (`M`, `W`, `F`).
+  - Pre-journey dates (before `profiles.myc_started_at`) visually muted as pre-journey.
+  - Future dates (beyond today in user's timezone) disabled and empty.
+  - Current date highlighted with an active focus ring.
+  - 5-level intensity scale (0 = unscheduled, 1 = 0%, 2 = 1–50%, 3 = 51–99%, 4 = 100% consistent).
+  - Hover and click details with popover showing date, percentage, completed/expected counts, and status.
+  - Accessible Intensity Legend component (`_components/calendar-legend.tsx`).
+  - Year navigation toolbar with bounds checking against `myc_started_at` and current year.
+  - Year summary cards (consistent days, overall completion percentage, total completed instances).
 
 ---
 
-# 11 — Calendar — Month / Week / Day
+# 11 — Calendar — Month / Week / Day ✅
 
 Build deeper calendar views.
-
-### Month
-
-Daily details.
-
-### Week
-
-Short-term consistency.
-
-### Day
-
-Commitment-level details.
 
 ```text
 Year
@@ -392,23 +383,37 @@ Day
 Commitments
 ```
 
-Also implement:
+_Done:_
 
-### Filter
-
-```text
-All
-DSA
-Project
-Workout
-Reading
-```
+- Month View (`_components/month-calendar.tsx`):
+  - Standard 7-column calendar grid aligned to Monday–Sunday.
+  - Shaded day cells showing day number, intensity color, and status dot.
+  - Interactive click navigation directly into Day view.
+  - Month summary metrics.
+- Week View (`_components/week-calendar.tsx`):
+  - 7-day card layout with weekday headers and date badges.
+  - Live preview checklist of scheduled commitments for each day.
+  - Click to select and drill into Day view.
+- Day View (`_components/day-calendar.tsx`):
+  - In-depth commitment-level view for any selected calendar date.
+  - Large SVG Progress Ring (`140px`) and linear completion bar.
+  - Full checklist of scheduled commitments with description and frequency details.
+  - Interactive completion toggle: integrates directly with `completeCommitment` and `uncompleteCommitment` RPCs with optimistic UI update and rollback.
+  - Guardrails: future dates and pre-journey dates show informative banners and disallow completion changes.
+- Commitment Filter:
+  - Dropdown selector supporting `All commitments` or filtering to any individual commitment.
+  - Dynamically recalculates daily summaries, intensities, and streaks using `calculateFilteredDailySummary`.
+- View Coordinator (`_components/calendar-view.tsx`):
+  - Connected SegmentedControl switcher (`Year`, `Month`, `Week`, `Day`).
+  - Bi-directional URL synchronization (`?view=&year=&month=&date=&commitment=`).
+  - Single-query server loader (`getCalendarData`) streaming via `<Suspense>`.
+  - Honest "Journey not started yet" empty state if `myc_started_at` is `null`.
 
 ---
 
-# 12 — Analytics Dashboard
+# 12 — Analytics Dashboard ✅
 
-Now build the dashboard around real data.
+Build the analytics dashboard around real database records.
 
 Implement:
 
@@ -427,7 +432,49 @@ Implement:
 - Monthly consistency
 - Commitment performance
 
-Don't overdo charts initially.
+_Done:_
+
+- Full Analytics page at `apps/web/src/app/(app)/analytics/page.tsx` and `_components/analytics-view.tsx`:
+  - 4 Key Metric Cards (`StatCard`): Current Streak, Best Streak, Consistent Days, Overall Consistency % (with progress rings and badges).
+  - Reporting Period Selector: `Last 7 Days` (`7d`), `Last 30 Days` (`30d`), `This Year` (`year`), and `All Time` (`all`).
+  - Weekly Consistency Bar Chart (`_components/analytics-chart.tsx`): 7-day bar chart with percentage heights, tooltips, and distinct diagonal styling for unscheduled days.
+  - Monthly Consistency Bar Chart: Day-by-day bar chart with month navigation controls (previous/next month) bounded to the user's journey.
+  - Commitment Performance Breakdown (`_components/commitment-performance-list.tsx`): Per-commitment cards showing kept instances, total scheduled instances, percentage badge, and linear progress bar.
+  - Server fetcher `getAnalyticsData` with zero mock data and zero N+1 database queries.
+  - Honest "Journey not started yet" state with CTA to define the first commitment.
+
+---
+
+# Fix — Immutable Commitment Completion, Activity Comments & Calendar Navigation Bug Fix ✅
+
+Core product rule: Commitment completion is permanent historical record and cannot be undone or reverted.
+
+_Done:_
+
+- **Permanent Completion Immutability:**
+  - Removed all uncomplete/undo interactions across Web (`TodayList`, `CommitmentsView`, `DayCalendar`) and Mobile (`App.tsx`). Completed items render permanent "Done" badges.
+  - Dropped `daily_completions_delete_own` RLS policy.
+  - Added statement-level trigger `tr_protect_daily_completion_immutability` rejecting any direct `UPDATE` or `DELETE` attempt by authenticated/anon roles.
+  - Replaced `uncomplete_commitment` RPC with a function that throws an exception and revoked execution rights from `authenticated`.
+- **Confirmation Flow with Optional Activity Notes:**
+  - Added `comment text null check (comment is null or length(comment) <= 1000)` column on `daily_completions`.
+  - Whitespace-trimmed; whitespace-only strings stored as `NULL`.
+  - Created `CompleteCommitmentDialog` (`apps/web/src/components/commitments/complete-commitment-dialog.tsx`) with commitment name, date, character count (`X / 1000`), permanent warning notice, and clean submit/cancel controls.
+- **Activity History & Timezone Timestamps:**
+  - Added indexes `(user_id, completed_at DESC)` and `(user_id, commitment_id, completed_at DESC)`.
+  - Added `getCompletionHistory` pure fetcher in `@myc/utils` with sorting by `completed_at DESC`.
+  - Created `CommitmentHistoryDialog` (`apps/web/src/components/commitments/commitment-history-dialog.tsx`) displaying chronological completion history with exact formatted timestamps in user's IANA timezone and blockquoted notes.
+  - Added Day Activity section in `DayCalendar` listing completed sessions for the date.
+- **Calendar Navigation Bug Fix:**
+  - Fixed issue where clicking previous/next arrows in `/calendar` changed URL/date label but failed to update commitment data.
+  - Keyed `<CalendarView key={`${data.view}-${data.selectedDate}-${data.filterCommitmentId}`} />` in server component to cleanly remount with fresh server data.
+  - Integrated `useTransition` with pending spinner and disabled states.
+- **Supabase Realtime Multi-Device Sync:**
+  - Added Realtime subscriptions on `daily_completions` in `CalendarView`, `DashboardView`, and `CommitmentsView` calling `router.refresh()` to propagate changes across devices without duplicate listeners.
+- **Testing & Verification:**
+  - 19 pgTAP tests in `daily_completions.test.sql` (36/36 tests passing across all test suites).
+  - 21 unit tests in `@myc/utils` covering math, immutability, date formatting, and streak edge cases.
+  - `npm run check` and `npm run build:web` passing with zero errors.
 
 ---
 

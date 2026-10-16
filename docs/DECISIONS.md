@@ -234,6 +234,50 @@ Task 09 implements pure, centralized calculations in `@myc/utils/consistency.ts`
 - "Not Started" State: Returns zeroed metrics when `myc_started_at` is `null`.
   **Consequences:** single source of truth across all platforms with 100% test coverage covering all 18 streak edge cases.
 
+### D-27 · Calendar Multi-View Hierarchy, Date Bounds, and Intensity Scale — 2026-10-17
+
+Tasks 10 & 11 establish the unified Calendar system (`apps/web/src/app/(app)/calendar/`):
+
+- 4 Views: Year (12-month contribution grid), Month (conventional calendar grid with weekday alignment), Week (7-day card layout with checklist preview), and Day (single-day detail with progress ring, checklist, and live complete/uncomplete toggle).
+- Journey Bounds: Calendar strictly starts at `profiles.myc_started_at` (never January 1 or account creation date). Pre-journey days are marked as pre-journey and excluded from metrics. Future dates (based on user's IANA timezone) are disabled and cannot be completed in advance. If `myc_started_at` is `null`, an honest "Journey not started yet" empty state is displayed with a direct CTA to create the first commitment.
+- 5-Level Intensity Scale:
+  - Level 0: Unscheduled (0 expected commitments).
+  - Level 1: 0% completion (expected > 0, 0 kept).
+  - Level 2: 1–50% completion.
+  - Level 3: 51–99% completion.
+  - Level 4: 100% consistent (all expected kept).
+- Commitment Filtering: Users can filter the calendar to "All commitments" or any individual commitment, dynamically recalculating expected/completed counts and intensity levels via `calculateFilteredDailySummary`.
+- Timezone Changes (resolving Q-06): Evaluated dynamically against `profiles.timezone`. Stored completion dates are permanent historical dates; timezone updates change the user's current today boundary and future scheduling without retroactively shifting completed calendar days.
+
+### D-28 · Analytics Dashboard, Reporting Periods, and Zero-Mock Architecture — 2026-10-17
+
+Task 12 establishes the Analytics system (`apps/web/src/app/(app)/analytics/`):
+
+- Reporting Periods: Supports Last 7 Days (`7d`), Last 30 Days (`30d`), This Year (`year`), and All Time (`all`).
+- Metric Integrity: Absolutely zero mock data or hardcoded stats. Metric cards (Current Streak, Best Streak, Consistent Days, Overall Consistency %), Weekly Consistency Bar Chart, Monthly Consistency Bar Chart, and Commitment Performance Breakdown are computed directly from database records via pure engine utilities in `@myc/utils`.
+- Accessible Visualizations: Custom semantic HTML/SVG bar charts with percentage labels, ARIA attributes, and clear diagonal hatch styling for unscheduled days.
+
+### D-29 · Permanent Completions, Activity Comments, and Realtime Multi-Device Sync — 2026-10-17
+
+TASK Fix establishes permanent completion immutability, activity notes, and fixes calendar navigation:
+
+- **Permanent Completion Immutability:** Once recorded, a commitment completion for a date cannot be undone, unchecked, edited, or deleted through any UI, API, or direct SQL operation.
+  - Database enforcement: Dropped `DELETE` RLS policy on `daily_completions`. Statement-level trigger `tr_protect_daily_completion_immutability` explicitly raises an exception on any authenticated/anon `UPDATE` or `DELETE` attempt. The `uncomplete_commitment` RPC is replaced to throw an exception and execute permission is revoked from `authenticated`.
+  - Client enforcement: Removed uncomplete/undo interactions in Web (`TodayList`, `CommitmentsView`, `DayCalendar`) and Mobile (`App.tsx`). Completed items render permanent "Done" badges.
+- **Confirmation Flow with Activity Comments:**
+  - Clicking an incomplete commitment opens `CompleteCommitmentDialog`.
+  - Heading: "Complete commitment?", commitment name, selected date.
+  - Optional activity note: max 1,000 characters, client and DB check (`comment is null or length(comment) <= 1000`). Trims whitespace and stores empty text as `NULL`.
+  - Prominent calm reminder: "Once submitted, this completion and its comment cannot be changed or undone."
+- **Activity History Experience:**
+  - Accessible `CommitmentHistoryDialog` and Day View activity list rendering completed sessions in chronological order with exact timestamps formatted in the user's IANA timezone (`formatCompletionTimestamp` / `formatCompletionTimeOnly`) and italic comment quotes.
+  - Indexes `(user_id, completed_at DESC)` and `(user_id, commitment_id, completed_at DESC)` support performant history queries.
+- **Calendar Navigation Bug Fix:**
+  - Resolved root cause where Day View queried a single day and navigating via prev/next arrows changed the client date state while `days` retained the previous day's data.
+  - Solution: Keyed `<CalendarView key={`${data.view}-${data.selectedDate}-${data.filterCommitmentId}`} />` in server component to cleanly remount with fresh server-rendered data, hooked into `useTransition` with pending indicators, and disabled rapid clicking while navigation is in flight.
+- **Realtime Multi-Device Sync:**
+  - Supabase Realtime channel subscription on `public.daily_completions` in `CalendarView`, `DashboardView`, and `CommitmentsView` calling `router.refresh()` to propagate changes across devices and tabs without duplicate listeners or manual browser refreshes.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.
@@ -242,5 +286,4 @@ Decide these before (or during) the task that needs them, then move each into th
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
 | Q-01 | **Android package ID.** `com.myc.app` is a placeholder; it becomes permanent with the first Play Store release. Which domain will MYC use? | 1.13      |
 | Q-02 | **Production Supabase project.** Name, region (development is `ap-northeast-1`) and plan.                                                  | 1.15      |
-| Q-06 | **Timezone changes.** Does a change apply from the next local day onward, and how are travel days counted (PRD §34, §42)?                  | 1.11      |
 | Q-08 | **Web hosting.** Vercel is assumed for production env vars; confirm.                                                                       | 1.15      |

@@ -1,14 +1,24 @@
 "use client";
 
 import { cn } from "cn";
-import { CheckIcon, CircleIcon, PlusIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  CircleIcon,
+  ClockIcon,
+  HistoryIcon,
+  MessageSquareIcon,
+  PlusIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import type { DailyCommitmentItem } from "@myc/types";
-import { formatFrequency } from "@myc/utils";
+import type { Commitment, DailyCommitmentItem, DailyCompletion } from "@myc/types";
+import { formatCompletionTimeOnly, formatFrequency } from "@myc/utils";
 
-import { buttonVariants } from "@/components/ui/button";
+import { CommitmentHistoryDialog } from "@/components/commitments/commitment-history-dialog";
+import { CompleteCommitmentDialog } from "@/components/commitments/complete-commitment-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 const DOT_TONE: Record<string, string> = {
@@ -22,21 +32,24 @@ const DOT_TONE: Record<string, string> = {
 interface TodayListProps {
   items: DailyCommitmentItem[];
   hasAnyCommitments: boolean;
-  onToggle: (commitmentId: string) => Promise<void>;
+  timezone?: string;
+  todayDate: string;
+  onCompleteSuccess: (completion: DailyCompletion) => void;
 }
 
-export function TodayList({ items, hasAnyCommitments, onToggle }: TodayListProps) {
-  const [pendingId, setPendingId] = useState<string | null>(null);
-
-  const handleToggle = async (id: string) => {
-    if (pendingId) return;
-    setPendingId(id);
-    try {
-      await onToggle(id);
-    } finally {
-      setPendingId(null);
-    }
-  };
+export function TodayList({
+  items,
+  hasAnyCommitments,
+  timezone = "UTC",
+  todayDate,
+  onCompleteSuccess,
+}: TodayListProps) {
+  const [activeCommitmentForComplete, setActiveCommitmentForComplete] = useState<Commitment | null>(
+    null,
+  );
+  const [activeCommitmentForHistory, setActiveCommitmentForHistory] = useState<Commitment | null>(
+    null,
+  );
 
   if (!hasAnyCommitments) {
     return (
@@ -72,68 +85,132 @@ export function TodayList({ items, hasAnyCommitments, onToggle }: TodayListProps
   }
 
   return (
-    <Card className="gap-0 py-2">
-      <ul className="divide-y divide-border/70">
-        {items.map(({ commitment, isCompleted }) => {
-          const isPending = pendingId === commitment.id;
-          const tone = commitment.tone || "sky";
+    <>
+      <Card className="gap-0 py-2">
+        <ul className="divide-y divide-border/70">
+          {items.map((item) => {
+            const { commitment, isCompleted, completedAt, comment } = item;
+            const tone = commitment.tone || "sky";
+            const completedTime = completedAt
+              ? formatCompletionTimeOnly(completedAt, timezone)
+              : null;
 
-          return (
-            <li
-              key={commitment.id}
-              className="flex items-center justify-between gap-3.5 px-4 py-3 sm:px-6"
-            >
-              <button
-                type="button"
-                onClick={() => handleToggle(commitment.id)}
-                disabled={isPending}
-                aria-label={`Mark "${commitment.title}" as ${isCompleted ? "incomplete" : "complete"}`}
-                aria-pressed={isCompleted}
+            return (
+              <li
+                key={commitment.id}
                 className={cn(
-                  "relative grid size-6 shrink-0 place-content-center rounded-full border transition-all duration-150 outline-none focus-visible:ring-4 focus-visible:ring-ring/30",
-                  isCompleted
-                    ? "border-primary bg-primary text-primary-foreground shadow-xs"
-                    : "border-input bg-card text-transparent hover:border-foreground/50",
-                  isPending && "opacity-60",
+                  "flex flex-col gap-2.5 px-4 py-3.5 transition-colors sm:px-6",
+                  isCompleted && "bg-accent/10",
                 )}
               >
-                {isCompleted ? (
-                  <CheckIcon className="size-3.5 stroke-[2.5]" />
-                ) : (
-                  <CircleIcon className="size-3 text-transparent" />
-                )}
-              </button>
+                <div className="flex items-center justify-between gap-3.5">
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
+                    {isCompleted ? (
+                      <div
+                        className="mt-0.5 grid size-6 shrink-0 place-content-center rounded-full text-emerald-600"
+                        aria-label={`"${commitment.title}" completed permanently`}
+                      >
+                        <CheckCircle2Icon className="size-5 fill-emerald-100 text-emerald-600" />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setActiveCommitmentForComplete(commitment)}
+                        aria-label={`Complete "${commitment.title}" for today`}
+                        className="mt-0.5 grid size-6 shrink-0 place-content-center rounded-full border border-input bg-card text-muted-foreground transition-all duration-150 outline-none hover:border-foreground/50 hover:text-foreground focus-visible:ring-4 focus-visible:ring-ring/30"
+                      >
+                        <CircleIcon className="size-4" />
+                      </button>
+                    )}
 
-              <div className="grid min-w-0 flex-1 gap-0.5">
-                <p
-                  className={cn(
-                    "truncate type-label text-foreground transition-all duration-150",
-                    isCompleted && "text-muted-foreground line-through decoration-border",
-                  )}
-                >
-                  {commitment.title}
-                </p>
-                <p className="flex items-center gap-1.5 type-caption text-muted-foreground">
-                  <span
-                    aria-hidden
-                    className={cn("size-1.5 rounded-full", DOT_TONE[tone] || "bg-sky")}
-                  />
-                  {formatFrequency(commitment.frequency, commitment.schedule_days)}
-                </p>
-              </div>
+                    <div className="grid min-w-0 flex-1 gap-0.5">
+                      <p
+                        className={cn(
+                          "truncate type-label text-foreground transition-all duration-150",
+                          isCompleted && "text-muted-foreground line-through decoration-border",
+                        )}
+                      >
+                        {commitment.title}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 type-caption text-muted-foreground">
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            aria-hidden
+                            className={cn("size-1.5 rounded-full", DOT_TONE[tone] || "bg-sky")}
+                          />
+                          {formatFrequency(commitment.frequency, commitment.schedule_days)}
+                        </span>
+                        {completedTime && (
+                          <span className="flex items-center gap-1 font-medium text-emerald-600">
+                            <ClockIcon className="size-3 shrink-0" aria-hidden="true" />
+                            {completedTime}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
-              <span
-                className={cn(
-                  "type-caption font-semibold",
-                  isCompleted ? "text-success" : "text-muted-foreground",
+                  <div className="flex items-center gap-2">
+                    {isCompleted ? (
+                      <Badge tone="success" className="text-[10px]">
+                        Done
+                      </Badge>
+                    ) : (
+                      <Badge tone="outline" className="text-[10px]">
+                        Not yet
+                      </Badge>
+                    )}
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setActiveCommitmentForHistory(commitment)}
+                      aria-label={`View history for ${commitment.title}`}
+                      title="View commitment history"
+                    >
+                      <HistoryIcon className="size-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Attached activity comment if completed */}
+                {isCompleted && comment && (
+                  <div className="ml-9 flex items-start gap-2 rounded-lg border border-border/50 bg-secondary/50 p-2.5 text-xs text-foreground">
+                    <MessageSquareIcon
+                      className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <blockquote className="leading-relaxed italic">
+                      &ldquo;{comment}&rdquo;
+                    </blockquote>
+                  </div>
                 )}
-              >
-                {isCompleted ? "Done" : "Not yet"}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </Card>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
+      {/* Confirmation Dialog */}
+      <CompleteCommitmentDialog
+        isOpen={Boolean(activeCommitmentForComplete)}
+        onClose={() => setActiveCommitmentForComplete(null)}
+        commitment={activeCommitmentForComplete}
+        date={todayDate}
+        onSuccess={(completion) => {
+          onCompleteSuccess(completion);
+          setActiveCommitmentForComplete(null);
+        }}
+      />
+
+      {/* History Dialog */}
+      <CommitmentHistoryDialog
+        isOpen={Boolean(activeCommitmentForHistory)}
+        onClose={() => setActiveCommitmentForHistory(null)}
+        commitment={activeCommitmentForHistory}
+        timezone={timezone}
+      />
+    </>
   );
 }

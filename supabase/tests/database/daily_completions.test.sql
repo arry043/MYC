@@ -7,13 +7,14 @@ set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(14);
+select plan(19);
 
 -- 1. Schema tests
 select has_table('public', 'daily_completions', 'public.daily_completions table exists');
 select has_column('public', 'daily_completions', 'commitment_id', 'daily_completions has commitment_id column');
 select has_column('public', 'daily_completions', 'date', 'daily_completions has date column');
 select has_column('public', 'daily_completions', 'completed_at', 'daily_completions has completed_at column');
+select has_column('public', 'daily_completions', 'comment', 'daily_completions has comment column');
 
 -- 2. Mock users and commitments setup
 create temporary table test_users (
@@ -117,6 +118,27 @@ select ok(
   'complete_commitment is idempotent on duplicate call'
 );
 
+-- Test duplicate completion does not overwrite original comment
+select is(
+  (select (public.complete_commitment('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-10'::date, 'Attempted overwrite'))->>'comment'),
+  null,
+  'duplicate completion does not overwrite original comment'
+);
+
+-- Test complete_commitment with comment on another eligible date
+select is(
+  (select (public.complete_commitment('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-09'::date, '  Solved 2 LeetCode problems  '))->>'comment'),
+  'Solved 2 LeetCode problems',
+  'complete_commitment trims and stores comment'
+);
+
+-- Test whitespace-only comment becomes null
+select is(
+  (select (public.complete_commitment('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', '2026-10-09'::date, '   '))->>'comment'),
+  null,
+  'whitespace-only comment becomes null'
+);
+
 -- Test User 1 cannot complete User 2's commitment
 select throws_ok(
   $$
@@ -162,25 +184,40 @@ select throws_ok(
   'unscheduled day of week completion is rejected'
 );
 
--- Test uncomplete_commitment RPC
-select is(
-  (select public.uncomplete_commitment('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-10'::date)),
-  true,
-  'uncomplete_commitment successfully removes completion'
+-- Test comments over 1000 characters are rejected
+select throws_ok(
+  $$
+    select public.complete_commitment('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-08'::date, repeat('a', 1001))
+  $$,
+  'Comment must be 1000 characters or fewer',
+  'comments over 1000 chars are rejected'
 );
 
--- Verify record is gone
-select is(
-  (select count(*)::integer from public.daily_completions where commitment_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and date = '2026-10-10'),
-  0,
-  'daily_completions row was removed by uncomplete_commitment'
+-- Test uncomplete_commitment throws error (completions are permanent)
+select throws_ok(
+  $$
+    select public.uncomplete_commitment('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-10'::date)
+  $$,
+  'Completions are permanent and cannot be undone or reverted',
+  'uncomplete_commitment throws permanent completion error'
 );
 
--- Test uncomplete_commitment idempotency (repeated call succeeds)
-select is(
-  (select public.uncomplete_commitment('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '2026-10-10'::date)),
-  true,
-  'uncomplete_commitment is idempotent when already uncompleted'
+-- Test direct DELETE by user fails (immutability)
+select throws_ok(
+  $$
+    delete from public.daily_completions where commitment_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and date = '2026-10-10'
+  $$,
+  'Completion records are permanent and cannot be deleted or undone',
+  'direct DELETE is rejected by trigger'
+);
+
+-- Test direct UPDATE by user fails (immutability)
+select throws_ok(
+  $$
+    update public.daily_completions set comment = 'hacked' where commitment_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' and date = '2026-10-10'
+  $$,
+  'Completion records and comments are permanent and cannot be modified',
+  'direct UPDATE is rejected by trigger'
 );
 
 select * from finish();
