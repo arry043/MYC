@@ -5,6 +5,8 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   CalendarIcon,
+  CheckIcon,
+  CircleIcon,
   MoreVerticalIcon,
   PauseIcon,
   PencilIcon,
@@ -16,8 +18,19 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
-import type { Commitment, CommitmentStatus, CommitmentTone, Profile } from "@myc/types";
-import { formatFrequency } from "@myc/utils";
+import type {
+  Commitment,
+  CommitmentStatus,
+  CommitmentTone,
+  DailyCompletion,
+  Profile,
+} from "@myc/types";
+import {
+  completeCommitment,
+  formatFrequency,
+  isCommitmentExpectedOnDate,
+  uncompleteCommitment,
+} from "@myc/utils";
 
 import { CommitmentDialog } from "@/components/commitments/commitment-dialog";
 import { DeleteCommitmentDialog } from "@/components/commitments/delete-commitment-dialog";
@@ -48,11 +61,21 @@ const TILE_TONE: Record<CommitmentTone, string> = {
 interface CommitmentsViewProps {
   initialCommitments: Commitment[];
   initialProfile: Profile | null;
+  initialTodayCompletions?: DailyCompletion[];
+  todayDate?: string;
 }
 
-export function CommitmentsView({ initialCommitments, initialProfile }: CommitmentsViewProps) {
+export function CommitmentsView({
+  initialCommitments,
+  initialProfile,
+  initialTodayCompletions,
+  todayDate,
+}: CommitmentsViewProps) {
   const [commitments, setCommitments] = useState<Commitment[]>(initialCommitments);
   const [profile, setProfile] = useState<Profile | null>(initialProfile);
+  const [todayCompletions, setTodayCompletions] = useState<DailyCompletion[]>(
+    initialTodayCompletions || [],
+  );
   const [filter, setFilter] = useState<"active" | "paused" | "archived">("active");
 
   // Modal dialog states
@@ -140,8 +163,54 @@ export function CommitmentsView({ initialCommitments, initialProfile }: Commitme
     }
   };
 
-  const handleCommitmentDeleted = (id: string) => {
-    setCommitments((prev) => prev.filter((c) => c.id !== id));
+  const handleCommitmentDeleted = (deletedId: string) => {
+    setCommitments((prev) => prev.filter((c) => c.id !== deletedId));
+    setTodayCompletions((prev) => prev.filter((c) => c.commitment_id !== deletedId));
+  };
+
+  const effectiveToday = todayDate || new Date().toISOString().slice(0, 10);
+
+  const handleToggleCompletion = async (commitmentId: string) => {
+    const isDone = todayCompletions.some(
+      (c) => c.commitment_id === commitmentId && c.date === effectiveToday,
+    );
+    const supabase = createClient();
+
+    const prevComps = [...todayCompletions];
+    if (!isDone) {
+      const mockComp: DailyCompletion = {
+        id: `opt-${Date.now()}`,
+        user_id: profile?.user_id || "",
+        commitment_id: commitmentId,
+        date: effectiveToday,
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+      setTodayCompletions([...todayCompletions, mockComp]);
+      const { data, error } = await completeCommitment(supabase, commitmentId, effectiveToday);
+      if (error) {
+        setTodayCompletions(prevComps);
+        toast({ title: "Could not mark done", description: error, tone: "error" });
+      } else if (data) {
+        setTodayCompletions((prev) =>
+          prev.map((c) =>
+            c.commitment_id === commitmentId && c.date === effectiveToday ? data : c,
+          ),
+        );
+      }
+    } else {
+      setTodayCompletions(
+        todayCompletions.filter(
+          (c) => !(c.commitment_id === commitmentId && c.date === effectiveToday),
+        ),
+      );
+      const { error } = await uncompleteCommitment(supabase, commitmentId, effectiveToday);
+      if (error) {
+        setTodayCompletions(prevComps);
+        toast({ title: "Could not undo", description: error, tone: "error" });
+      }
+    }
   };
 
   return (
@@ -246,6 +315,15 @@ export function CommitmentsView({ initialCommitments, initialProfile }: Commitme
               const tone = (commitment.tone as CommitmentTone) || "sky";
               const isPaused = commitment.status === "paused";
               const isArchived = commitment.status === "archived";
+
+              const isScheduledToday = isCommitmentExpectedOnDate(
+                commitment,
+                effectiveToday,
+                profile?.myc_started_at,
+              );
+              const isDoneToday = todayCompletions.some(
+                (c) => c.commitment_id === commitment.id && c.date === effectiveToday,
+              );
 
               return (
                 <StaggerItem key={commitment.id}>
@@ -359,6 +437,36 @@ export function CommitmentsView({ initialCommitments, initialProfile }: Commitme
                         <CalendarIcon className="size-3.5" />
                         Started {commitment.start_date}
                       </span>
+
+                      {commitment.status === "active" &&
+                        (isScheduledToday ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCompletion(commitment.id)}
+                            className={cn(
+                              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 type-caption font-semibold transition-all duration-150 outline-none focus-visible:ring-4 focus-visible:ring-ring/30",
+                              isDoneToday
+                                ? "bg-mint text-mint-foreground hover:opacity-90"
+                                : "border border-input bg-card text-foreground/80 hover:border-foreground/40",
+                            )}
+                          >
+                            {isDoneToday ? (
+                              <>
+                                <CheckIcon className="size-3.5 stroke-[2.5]" />
+                                <span>Done today</span>
+                              </>
+                            ) : (
+                              <>
+                                <CircleIcon className="size-3 text-muted-foreground" />
+                                <span>Mark done</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="type-caption text-muted-foreground/75">
+                            Not scheduled today
+                          </span>
+                        ))}
                     </div>
                   </Card>
                 </StaggerItem>

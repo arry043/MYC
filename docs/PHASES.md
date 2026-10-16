@@ -260,7 +260,7 @@ _Done:_
 
 ---
 
-# 08 — Daily Completion System
+# 08 — Daily Completion System ✅
 
 Now make MYC actually track consistency.
 
@@ -292,18 +292,23 @@ completed_at
 created_at
 ```
 
-Handle:
+_Done:_
 
-- Complete
-- Uncomplete
-- Duplicate requests
-- Future dates
-- Inactive commitments
-- Timezone
+- Migration `20261016185928_daily_completions.sql` applied to development database.
+- Unique constraint `UNIQUE (user_id, commitment_id, date)` preventing duplicate completions.
+- Owner-only RLS policies for `SELECT`, `INSERT`, `DELETE`.
+- Trigger `tr_check_daily_completion_rules`:
+  - Blocks completions prior to user's `myc_started_at`.
+  - Blocks future dates based on profile IANA timezone (`now() AT TIME ZONE profile.timezone`).
+  - Verifies commitment is active, owned by caller, within valid date range, and scheduled for the date's ISO weekday if `specific_days`.
+- RPCs: `complete_commitment(p_commitment_id, p_date)` and `uncomplete_commitment(p_commitment_id, p_date)` for atomic, idempotent toggling.
+- 14 pgTAP database tests in `supabase/tests/database/daily_completions.test.sql` verifying all constraints, future date rejections, RLS isolation, and RPC operations.
+- Interactive Today's Commitments UI on Dashboard (`apps/web/src/app/(app)/dashboard/_components/today-list.tsx`) and Commitments page with optimistic updates and rollback on error.
+- Mobile toggle completion support in `apps/mobile/src/App.tsx`.
 
 ---
 
-# 09 — Streak Engine
+# 09 — Streak Engine ✅
 
 Build the consistency calculation engine.
 
@@ -317,17 +322,18 @@ Implement:
 
 Keep this logic centralized.
 
-For example:
+_Done:_
 
-```text
-lib/
-└── consistency/
-    ├── streak.ts
-    ├── daily-score.ts
-    └── analytics.ts
-```
-
-Don't duplicate streak calculations across pages.
+- Centralized consistency engine in `packages/utils/src/consistency.ts` re-exported at `@myc/utils`:
+  - `getUserLocalDateString`, `getIsoWeekday`, `addDays`, `getDateRange`, `isDateInFuture`, `isValidTimezone`.
+  - `isCommitmentExpectedOnDate`, `getExpectedCommitmentsForDate`: pure scheduling evaluation.
+  - `calculateDailySummary`: daily score calculation (`completed / expected * 100`, `null` if unscheduled).
+  - `calculateCurrentStreak` & `calculateBestStreak`: pure streak calculations supporting continuing streaks from yesterday, neutral unscheduled days (0 expected), and edge cases.
+  - `calculateConsistencyMetrics`: consistent days count and overall weighted percentage (`total_completed / total_expected * 100`).
+  - `getDashboardConsistencyData`: unified server-side fetcher querying Supabase and producing comprehensive dashboard data.
+- 15 unit tests in `packages/utils/src/consistency.test.ts` covering all 18 specified streak cases, math formulas, and date helpers.
+- Dashboard integration (`apps/web/src/app/(app)/dashboard/page.tsx` & `dashboard-view.tsx`) displaying real streaks, consistent days, daily progress ring, linear bar, 7-day trend chart, and journey duration.
+- Clean empty / not-started states when `myc_started_at` is `null`.
 
 ---
 

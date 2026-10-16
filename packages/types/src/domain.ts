@@ -35,3 +35,31 @@ export interface ConfirmCommitmentResult {
   profile: Profile;
   myc_started_at: string;
 }
+
+export type DailyCompletion = Tables<"daily_completions">;
+
+export interface DailyCommitmentItem {
+  commitment: Commitment;
+  isCompleted: boolean;
+  completedAt: string | null;
+}
+
+export interface DailyConsistencySummary {
+  date: string;
+  expected: number;
+  completed: number;
+  percentage: number | null;
+  isConsistent: boolean | null;
+}
+
+export interface ConsistencyMetrics {
+  currentStreak: number;
+  bestStreak: number;
+  consistentDays: number;
+  overallPercentage: number | null;
+  today: DailyConsistencySummary;
+  journeyStarted: boolean;
+  mycStartedAt: string | null;
+  totalExpectedCommitmentDays: number;
+  totalCompletedCommitmentDays: number;
+}

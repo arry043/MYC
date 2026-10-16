@@ -53,6 +53,44 @@ export type Database = {
         };
         Relationships: [];
       };
+      daily_completions: {
+        Row: {
+          commitment_id: string;
+          completed_at: string;
+          created_at: string;
+          date: string;
+          id: string;
+          status: string;
+          user_id: string;
+        };
+        Insert: {
+          commitment_id: string;
+          completed_at?: string;
+          created_at?: string;
+          date: string;
+          id?: string;
+          status?: string;
+          user_id: string;
+        };
+        Update: {
+          commitment_id?: string;
+          completed_at?: string;
+          created_at?: string;
+          date?: string;
+          id?: string;
+          status?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "daily_completions_commitment_id_fkey";
+            columns: ["commitment_id"];
+            isOneToOne: false;
+            referencedRelation: "commitments";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       profiles: {
         Row: {
           created_at: string;
@@ -85,6 +123,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      complete_commitment: {
+        Args: { p_commitment_id: string; p_date?: string };
+        Returns: Json;
+      };
       confirm_first_commitment: {
         Args: { client_local_date?: string; commitment_id: string };
         Returns: Json;
@@ -105,6 +147,10 @@ export type Database = {
           isOneToOne: true;
           isSetofReturn: false;
         };
+      };
+      uncomplete_commitment: {
+        Args: { p_commitment_id: string; p_date?: string };
+        Returns: boolean;
       };
     };
     Enums: {
