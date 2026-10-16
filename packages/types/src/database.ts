@@ -8,13 +8,104 @@ export type Database = {
   };
   public: {
     Tables: {
-      [_ in never]: never;
+      commitments: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          end_date: string | null;
+          frequency: string;
+          id: string;
+          schedule_days: number[] | null;
+          start_date: string;
+          status: string;
+          title: string;
+          tone: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          end_date?: string | null;
+          frequency?: string;
+          id?: string;
+          schedule_days?: number[] | null;
+          start_date?: string;
+          status?: string;
+          title: string;
+          tone?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          end_date?: string | null;
+          frequency?: string;
+          id?: string;
+          schedule_days?: number[] | null;
+          start_date?: string;
+          status?: string;
+          title?: string;
+          tone?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      profiles: {
+        Row: {
+          created_at: string;
+          id: string;
+          myc_started_at: string | null;
+          timezone: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          myc_started_at?: string | null;
+          timezone?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          myc_started_at?: string | null;
+          timezone?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      confirm_first_commitment: {
+        Args: { client_local_date?: string; commitment_id: string };
+        Returns: Json;
+      };
+      ensure_profile: {
+        Args: { detected_timezone?: string };
+        Returns: {
+          created_at: string;
+          id: string;
+          myc_started_at: string | null;
+          timezone: string;
+          updated_at: string;
+          user_id: string;
+        };
+        SetofOptions: {
+          from: "*";
+          to: "profiles";
+          isOneToOne: true;
+          isSetofReturn: false;
+        };
+      };
     };
     Enums: {
       [_ in never]: never;

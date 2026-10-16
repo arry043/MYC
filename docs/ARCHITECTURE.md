@@ -4,9 +4,9 @@ How MYC is built and why. For the product itself see [PRD.md](PRD.md); for the r
 change must follow see [RULES.md](RULES.md); for the reasoning behind specific choices see
 [DECISIONS.md](DECISIONS.md).
 
-> **Current state:** foundation, design system and app shell (tasks 01–03 in
-> [PHASES.md](PHASES.md)); pages show static sample content. Sections
-> marked _Planned_ describe where future work goes, not code that exists today.
+> **Current state:** foundation, design system, authentication, user profiles, onboarding,
+> first commitment ("I COMMIT"), and commitment management (tasks 01–07 in [PHASES.md](PHASES.md)).
+> `/commitments` and `/onboarding` connect to live Supabase backend. Other pages show static sample content.
 
 ## 1. Principles
 
@@ -74,24 +74,25 @@ Packages never import from apps, and `packages/utils` never imports platform API
 
 ## 4. Web — `apps/web`
 
-| Concern             | Implementation                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Framework           | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                                     |
-| Styling             | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans                               |
-| Components          | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn)                   |
-| Motion              | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17)                   |
-| App shell           | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error                           |
-| Routes              | `/dashboard`, `/calendar`, `/commitments`, `/analytics`, `/settings`: static samples (D-18)                        |
-| Authentication      | `src/app/(auth)/` (login, signup, verify-email, forgot-password, reset-password), `src/app/auth/callback/route.ts` |
-| Account Security    | `src/app/(app)/settings/_components/account-security-section.tsx`: Google linking, password management             |
-| Route Guard / Proxy | `src/proxy.ts` (Next 16 proxy) — session refresh, route boundaries, and unverified email redirection (D-24)        |
-| Supabase (browser)  | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                                     |
-| Supabase (server)   | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only`                   |
-| Env                 | `src/lib/env.ts` — validated lazily when a client is created                                                       |
-| PWA                 | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`                              |
-| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                                  |
-| Dev diagnostics     | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                                        |
-| Component gallery   | `src/app/(app)/dev/ui/` — every component and state, 404 in production                                             |
+| Concern             | Implementation                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Framework           | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                                                  |
+| Styling             | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans                                            |
+| Components          | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn)                                |
+| Motion              | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17)                                |
+| App shell           | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error                                        |
+| Routes              | `/commitments` (live Supabase stream, active/paused/archived tabs), `/onboarding` (4-step onboarding wizard)                    |
+| Sample Routes       | `/dashboard`, `/calendar`, `/analytics`: static samples (D-18) until Tasks 08–12                                                |
+| Authentication      | `src/app/(auth)/` (login, signup, verify-email, forgot-password, reset-password), `src/app/auth/callback/route.ts`              |
+| Profile & Security  | `src/app/(app)/settings/`: timezone selection (`ProfileSettingsSection`), Google linking & passwords (`AccountSecuritySection`) |
+| Route Guard / Proxy | `src/proxy.ts` (Next 16 proxy) — session refresh, route boundaries, and unverified email redirection (D-20)                     |
+| Supabase (browser)  | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                                                  |
+| Supabase (server)   | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only`                                |
+| Env                 | `src/lib/env.ts` — validated lazily when a client is created                                                                    |
+| PWA                 | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`                                           |
+| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                                               |
+| Dev diagnostics     | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                                                     |
+| Component gallery   | `src/app/(app)/dev/ui/` — every component and state, 404 in production                                                          |
 
 Layout breakpoints: phone (< 768px) has a compact header, single column and a bottom bar with
 the four main sections (Settings in the header); tablet (768–1023px) has a labelled icon rail;
@@ -121,18 +122,20 @@ plugin that reads the signed-in user's data through Supabase — never a separat
 | -------------- | ----------------------------------------------------------------------------------------------------- |
 | Schema         | Only SQL migrations in `supabase/migrations/` define it ([supabase/README.md](../supabase/README.md)) |
 | RLS guardrail  | `ensure_rls` event trigger enables RLS on every new `public` table and fails closed                   |
-| Tests          | pgTAP in `supabase/tests/database/`, run with `npm run db:test`                                       |
+| Tests          | pgTAP in `supabase/tests/database/`, run with `npm run db:test` (17 tests passing)                    |
 | Types          | `npm run db:types` → `packages/types/src/database.ts`                                                 |
 | Edge Functions | `supabase/functions/` (none yet) — the only place the service-role key may be used                    |
-| Auth           | Supabase Auth (email/password first) — _planned in Phase 1.03_                                        |
+| Auth           | Supabase Auth (Email/Password + Google OAuth, linking, verification)                                  |
+| Profiles       | `profiles` table: timezone persistence, immutable `myc_started_at`, `ensure_profile` RPC              |
+| Commitments    | `commitments` table: CRUD, lifecycle, atomic `confirm_first_commitment` RPC                           |
 | Realtime       | Enabled; used where live sync helps (e.g. completion state across devices) — _planned_                |
 
-### Planned data model (PRD §33)
+### Data model (PRD §33)
 
 ```text
-auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first "I COMMIT", timezone)
-            ├─ 1:n ─ commitments       (title, schedule/frequency, status lifecycle)
-            └─ 1:n ─ daily_completions (commitment_id, date, status, completed_at)
+auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first "I COMMIT", timezone)  [Implemented]
+            ├─ 1:n ─ commitments       (title, schedule/frequency, status lifecycle)           [Implemented]
+            └─ 1:n ─ daily_completions (commitment_id, date, status, completed_at)             [Planned Task 08]
                                         unique (commitment_id, date)
 ```
 
@@ -140,9 +143,10 @@ auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first 
 - `date` columns hold the **user's local calendar date** (per `profiles.timezone`), never a
   UTC-derived date, so history doesn't shift when viewed from another timezone.
 - Rules with integrity impact live in the database: `myc_started_at` is set once by the first
-  "I COMMIT"; future dates can't be completed; duplicate completions are rejected by a unique
-  constraint.
-- Streaks and consistency are computed by SQL functions/views over `daily_completions`, so
+  "I COMMIT" via `confirm_first_commitment` RPC; direct updates are rejected by trigger
+  `tr_protect_profile_fields`; first commitment activation outside "I COMMIT" is rejected by
+  `tr_check_commitment_rules`.
+- Streaks and consistency will be computed by SQL functions/views over `daily_completions` (Task 08+), so
   every client gets identical numbers.
 
 ## 7. Type flow

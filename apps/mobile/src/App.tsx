@@ -106,8 +106,62 @@ export default function App() {
     setActionLoading(true);
     await signOutMobile();
     setCurrentUser(null);
+    setProfile(null);
+    setCommitments([]);
     setActionLoading(false);
   };
+
+  const [profile, setProfile] = useState<{
+    timezone: string;
+    myc_started_at: string | null;
+  } | null>(null);
+  const [commitments, setCommitments] = useState<
+    {
+      id: string;
+      title: string;
+      frequency: string;
+      schedule_days: number[] | null;
+      status: string;
+    }[]
+  >([]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let isMounted = true;
+
+    const loadData = async () => {
+      const supabase = getSupabase();
+      let tz = "UTC";
+      try {
+        const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (detected) tz = detected;
+      } catch {
+        // fallback
+      }
+
+      const { data: profileData } = await supabase.rpc("ensure_profile", {
+        detected_timezone: tz,
+      });
+      if (isMounted && profileData) {
+        setProfile(profileData);
+      }
+
+      const { data: commitmentsData } = await supabase
+        .from("commitments")
+        .select("id, title, frequency, schedule_days, status")
+        .order("created_at", { ascending: false });
+
+      if (isMounted && commitmentsData) {
+        setCommitments(commitmentsData);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
 
   const identitiesSummary = extractAuthIdentities(currentUser);
 
@@ -145,9 +199,47 @@ export default function App() {
             )}
           </View>
 
-          <Text style={styles.infoText}>
-            Your multi-device identity is active on this Android device.
-          </Text>
+          {/* Profile & Journey info */}
+          <View style={styles.profileSection}>
+            <Text style={styles.profileMetaLabel}>
+              Timezone: {profile?.timezone ?? "Detecting..."}
+            </Text>
+            <Text style={styles.profileMetaLabel}>
+              Journey:{" "}
+              {profile?.myc_started_at
+                ? `Started on ${profile.myc_started_at}`
+                : 'Pending first "I COMMIT"'}
+            </Text>
+          </View>
+
+          {/* Commitments list */}
+          <View style={styles.commitmentsSection}>
+            <Text style={styles.sectionTitle}>Your Commitments ({commitments.length})</Text>
+            {commitments.length === 0 ? (
+              <Text style={styles.emptyText}>
+                No commitments yet. Create your first commitment on Web or Mobile to begin.
+              </Text>
+            ) : (
+              commitments.map((c) => (
+                <View key={c.id} style={styles.commitmentItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.commitmentTitle}>{c.title}</Text>
+                    <Text style={styles.commitmentFreq}>
+                      {c.frequency === "daily" ? "Every day" : "Scheduled days"}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.statusPill,
+                      c.status === "active" ? styles.statusActive : styles.statusPaused,
+                    ]}
+                  >
+                    <Text style={styles.statusPillText}>{c.status}</Text>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
 
           <Pressable
             style={[styles.button, styles.signOutButton]}
@@ -417,5 +509,68 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 13,
     color: "#234e52",
+  },
+  profileSection: {
+    backgroundColor: "#f5f3ee",
+    padding: 12,
+    borderRadius: 8,
+    gap: 4,
+    marginVertical: 4,
+  },
+  profileMetaLabel: {
+    fontSize: 13,
+    color: "#4a4a4a",
+  },
+  commitmentsSection: {
+    marginTop: 6,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#737373",
+    fontStyle: "italic",
+    paddingVertical: 6,
+  },
+  commitmentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#faf9f6",
+    borderWidth: 1,
+    borderColor: "#e8e5dc",
+    padding: 10,
+    borderRadius: 8,
+  },
+  commitmentTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#0a0a0a",
+  },
+  commitmentFreq: {
+    fontSize: 12,
+    color: "#737373",
+    marginTop: 2,
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  statusActive: {
+    backgroundColor: "#e6fffa",
+  },
+  statusPaused: {
+    backgroundColor: "#edf2f7",
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#2d3748",
+    textTransform: "capitalize",
   },
 });

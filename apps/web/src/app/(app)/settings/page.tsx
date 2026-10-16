@@ -2,10 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Field, FieldHint, Label } from "@/components/ui/label";
+import { Field, Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,14 +15,9 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
 import { AccountSecuritySection } from "./_components/account-security-section";
+import { ProfileSettingsSection } from "./_components/profile-settings-section";
 
 export const metadata: Metadata = { title: "Settings" };
-
-const timezones = [
-  { value: "Asia/Kolkata", label: "India (GMT+5:30)" },
-  { value: "Europe/London", label: "London (GMT+1)" },
-  { value: "America/New_York", label: "New York (GMT−4)" },
-];
 
 const reminderTimes = [
   { value: "07:00", label: "7:00 AM" },
@@ -87,43 +80,7 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-stack">
-        <SettingsSection
-          title="Profile"
-          description="How MYC greets you, and the day boundary it uses."
-        >
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field>
-              <Label htmlFor="display-name">Display name</Label>
-              <Input id="display-name" placeholder="Your name" autoComplete="name" />
-            </Field>
-            <Field>
-              <Label htmlFor="profile-email-placeholder">Email</Label>
-              <Input
-                id="profile-email-placeholder"
-                type="email"
-                placeholder="Managed in Account & Security"
-                disabled
-              />
-              <FieldHint>Managed in Account & Security below.</FieldHint>
-            </Field>
-          </div>
-          <Field>
-            <Label id="timezone-label">Timezone</Label>
-            <Select items={timezones} defaultValue="Asia/Kolkata">
-              <SelectTrigger aria-labelledby="timezone-label" className="sm:max-w-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {timezones.map((zone) => (
-                  <SelectItem key={zone.value} value={zone.value}>
-                    {zone.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FieldHint>Your day starts and ends at midnight in this timezone.</FieldHint>
-          </Field>
-        </SettingsSection>
+        <ProfileSettingsSection />
 
         <SettingsSection
           title="Reminders"
@@ -174,11 +131,6 @@ export default function SettingsPage() {
         >
           <AccountSecuritySection />
         </Suspense>
-
-        <div className="flex justify-end gap-2.5 max-sm:flex-col-reverse">
-          <Button variant="ghost">Cancel</Button>
-          <Button>Save changes</Button>
-        </div>
       </div>
     </>
   );
