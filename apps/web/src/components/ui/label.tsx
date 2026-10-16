@@ -28,4 +28,14 @@ function FieldHint({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
-export { Field, FieldHint, Label };
+function FieldError({ className, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="field-error"
+      className={cn("type-caption font-medium text-destructive", className)}
+      {...props}
+    />
+  );
+}
+
+export { Field, FieldError, FieldHint, Label };

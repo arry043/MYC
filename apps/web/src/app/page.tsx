@@ -18,10 +18,15 @@ export default function HomePage() {
         <p className="type-body text-muted-foreground">
           Don&apos;t rely on motivation. Build consistency.
         </p>
-        <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>
-          Open MYC
-          <ArrowRightIcon />
-        </Link>
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <Link href="/dashboard" className={buttonVariants({ size: "lg" })}>
+            Open MYC
+            <ArrowRightIcon />
+          </Link>
+          <Link href="/login" className={buttonVariants({ variant: "secondary", size: "lg" })}>
+            Sign in
+          </Link>
+        </div>
       </FadeIn>
     </main>
   );

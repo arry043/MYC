@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+
+import { AccountSecuritySection } from "./_components/account-security-section";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -80,7 +83,7 @@ export default function SettingsPage() {
       <PageHeader
         eyebrow="Settings"
         title="Make MYC work for you"
-        description="Your profile, reminders and account."
+        description="Your profile, reminders and account security."
       />
 
       <div className="grid gap-stack">
@@ -94,9 +97,14 @@ export default function SettingsPage() {
               <Input id="display-name" placeholder="Your name" autoComplete="name" />
             </Field>
             <Field>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" disabled />
-              <FieldHint>Set when you create your account.</FieldHint>
+              <Label htmlFor="profile-email-placeholder">Email</Label>
+              <Input
+                id="profile-email-placeholder"
+                type="email"
+                placeholder="Managed in Account & Security"
+                disabled
+              />
+              <FieldHint>Managed in Account & Security below.</FieldHint>
             </Field>
           </div>
           <Field>
@@ -151,22 +159,21 @@ export default function SettingsPage() {
           </Field>
         </SettingsSection>
 
-        <SettingsSection
-          title="Account"
-          description="Sign-in and data controls arrive with accounts."
+        {/* Real Account & Security Section wrapped in Suspense for useSearchParams */}
+        <Suspense
+          fallback={
+            <Card className="gap-6 p-card shadow-raised">
+              <div className="grid gap-2">
+                <h2 className="type-h3">Account & Security</h2>
+                <p className="type-small text-muted-foreground">
+                  Loading account security settings...
+                </p>
+              </div>
+            </Card>
+          }
         >
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="grid gap-0.5">
-              <p className="type-label">Delete account</p>
-              <p className="type-small text-muted-foreground">
-                Permanently removes your commitments and history.
-              </p>
-            </div>
-            <Button variant="destructive" disabled>
-              Delete account
-            </Button>
-          </div>
-        </SettingsSection>
+          <AccountSecuritySection />
+        </Suspense>
 
         <div className="flex justify-end gap-2.5 max-sm:flex-col-reverse">
           <Button variant="ghost">Cancel</Button>

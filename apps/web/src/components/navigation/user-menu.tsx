@@ -2,6 +2,8 @@
 
 import { LogOutIcon, SettingsIcon, UserRoundIcon } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import {
   DropdownMenu,
@@ -12,12 +14,41 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { createClient } from "@/lib/supabase/client";
 
 /**
- * Account menu in the header. There are no accounts until authentication (task 04), so it
- * shows a generic avatar and sign-out is disabled.
+ * Account menu in the header. Shows user's identity status and provides local sign-out.
  */
 function UserMenu() {
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) {
+        setEmail(user.email);
+      }
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setEmail(session?.user?.email ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut({ scope: "local" });
+    router.push("/login");
+    router.refresh();
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -28,14 +59,19 @@ function UserMenu() {
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuGroup>
-          <DropdownMenuLabel>Account</DropdownMenuLabel>
+          <DropdownMenuLabel className="max-w-[14rem] truncate font-medium">
+            {email ?? "Account"}
+          </DropdownMenuLabel>
           <DropdownMenuItem render={<Link href="/settings" />}>
             <SettingsIcon />
             Settings
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem
+          onClick={handleSignOut}
+          className="text-destructive focus:text-destructive"
+        >
           <LogOutIcon />
           Sign out
         </DropdownMenuItem>

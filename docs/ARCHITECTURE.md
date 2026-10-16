@@ -74,29 +74,30 @@ Packages never import from apps, and `packages/utils` never imports platform API
 
 ## 4. Web — `apps/web`
 
-| Concern            | Implementation                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------ |
-| Framework          | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                   |
-| Styling            | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans             |
-| Components         | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn) |
-| Motion             | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17) |
-| App shell          | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error         |
-| Routes             | `/dashboard`, `/calendar`, `/commitments`, `/analytics`, `/settings`: static samples (D-18)      |
-| Supabase (browser) | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                   |
-| Supabase (server)  | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only` |
-| Env                | `src/lib/env.ts` — validated lazily when a client is created                                     |
-| PWA                | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`            |
-| Security headers   | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                |
-| Dev diagnostics    | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                      |
-| Component gallery  | `src/app/(app)/dev/ui/` — every component and state, 404 in production                           |
+| Concern             | Implementation                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Framework           | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                                     |
+| Styling             | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans                               |
+| Components          | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn)                   |
+| Motion              | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17)                   |
+| App shell           | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error                           |
+| Routes              | `/dashboard`, `/calendar`, `/commitments`, `/analytics`, `/settings`: static samples (D-18)                        |
+| Authentication      | `src/app/(auth)/` (login, signup, verify-email, forgot-password, reset-password), `src/app/auth/callback/route.ts` |
+| Account Security    | `src/app/(app)/settings/_components/account-security-section.tsx`: Google linking, password management             |
+| Route Guard / Proxy | `src/proxy.ts` (Next 16 proxy) — session refresh, route boundaries, and unverified email redirection (D-24)        |
+| Supabase (browser)  | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                                     |
+| Supabase (server)   | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only`                   |
+| Env                 | `src/lib/env.ts` — validated lazily when a client is created                                                       |
+| PWA                 | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`                              |
+| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                                  |
+| Dev diagnostics     | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                                        |
+| Component gallery   | `src/app/(app)/dev/ui/` — every component and state, 404 in production                                             |
 
 Layout breakpoints: phone (< 768px) has a compact header, single column and a bottom bar with
 the four main sections (Settings in the header); tablet (768–1023px) has a labelled icon rail;
 desktop (≥ 1024px) has a full sidebar. Spacing tokens shrink on smaller screens.
 
-_Planned:_ `src/proxy.ts` (Next 16's replacement for `middleware.ts`) to refresh Supabase auth
-sessions on each request; route groups for signed-in vs. public pages; a service worker for the
-basic offline shell.
+_Planned:_ a service worker for the basic offline shell.
 
 ## 5. Mobile — `apps/mobile`
 

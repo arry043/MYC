@@ -28,7 +28,7 @@ PHASE 1
 ├── 01. Project Foundation          ✅
 ├── 02. Supabase Foundation         ✅
 ├── 03. Design System & App Shell   ✅
-├── 04. Authentication
+├── 04. Authentication              ✅
 ├── 05. User Profile & Onboarding
 ├── 06. First Commitment + "I COMMIT"
 ├── 07. Commitment Management
@@ -129,29 +129,33 @@ No actual functionality yet.
 
 ---
 
-# 04 — Authentication
+# 04 — Authentication ✅
 
 **Implement:**
 
-- Sign up
-- Login
-- Logout
-- Email verification
-- Forgot password
-- Reset password
-- Session persistence
-- Protected routes
-- Auth middleware
-- Auth loading states
+- Sign up (email + password and Google OAuth)
+- Login (email + password and Google OAuth)
+- Logout (local scope sign-out with cache refresh)
+- Email verification (cooldown, resend verification email)
+- Forgot password (anti-enumeration recovery email)
+- Reset password (secure recovery password update)
+- Account linking (link Google to email account, set password on Google account without duplicate identities)
+- Session persistence across reloads and multi-device sessions (Web SSR cookies & Mobile SecureStore)
+- Protected routes and email verification gatekeeper via Next.js 16 `proxy.ts`
+- Account & Security section in Settings (`apps/web/src/app/(app)/settings/_components/account-security-section.tsx`)
+- Shared authentication utilities (`@myc/utils/auth`) with unit tests
+- Mobile authentication manager (`apps/mobile/src/lib/auth.ts`) with deep link handling (`myc://auth/callback`)
 
 **Output:**
 
 ```text
-Register
+Register / Sign In (Email or Google)
    ↓
-Login
+Email Verification Gate (if Email/Password)
    ↓
-Authenticated MYC
+Authenticated MYC App (Web + Mobile)
+   ↓
+Account & Security Management (Link Google, Set/Change Password)
 ```
 
 ---
