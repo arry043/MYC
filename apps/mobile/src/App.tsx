@@ -183,23 +183,14 @@ export default function App() {
 
   const handleToggleCompletion = async (commitmentId: string) => {
     const isDone = todayCompletions.includes(commitmentId);
+    if (isDone) return; // Permanent: completions cannot be undone
     const supabase = getSupabase();
-    if (!isDone) {
-      setTodayCompletions((prev) => [...prev, commitmentId]);
-      const { error } = await supabase.rpc("complete_commitment", {
-        p_commitment_id: commitmentId,
-      });
-      if (error) {
-        setTodayCompletions((prev) => prev.filter((id) => id !== commitmentId));
-      }
-    } else {
+    setTodayCompletions((prev) => [...prev, commitmentId]);
+    const { error } = await supabase.rpc("complete_commitment", {
+      p_commitment_id: commitmentId,
+    });
+    if (error) {
       setTodayCompletions((prev) => prev.filter((id) => id !== commitmentId));
-      const { error } = await supabase.rpc("uncomplete_commitment", {
-        p_commitment_id: commitmentId,
-      });
-      if (error) {
-        setTodayCompletions((prev) => [...prev, commitmentId]);
-      }
     }
   };
 
@@ -274,6 +265,7 @@ export default function App() {
                       {c.status === "active" && (
                         <Pressable
                           onPress={() => handleToggleCompletion(c.id)}
+                          disabled={isDone}
                           style={[
                             styles.checkButton,
                             isDone ? styles.checkButtonDone : styles.checkButtonPending,

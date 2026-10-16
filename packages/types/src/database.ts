@@ -55,6 +55,7 @@ export type Database = {
       };
       daily_completions: {
         Row: {
+          comment: string | null;
           commitment_id: string;
           completed_at: string;
           created_at: string;
@@ -64,6 +65,7 @@ export type Database = {
           user_id: string;
         };
         Insert: {
+          comment?: string | null;
           commitment_id: string;
           completed_at?: string;
           created_at?: string;
@@ -73,6 +75,7 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          comment?: string | null;
           commitment_id?: string;
           completed_at?: string;
           created_at?: string;
@@ -124,7 +127,7 @@ export type Database = {
     };
     Functions: {
       complete_commitment: {
-        Args: { p_commitment_id: string; p_date?: string };
+        Args: { p_comment?: string; p_commitment_id: string; p_date?: string };
         Returns: Json;
       };
       confirm_first_commitment: {

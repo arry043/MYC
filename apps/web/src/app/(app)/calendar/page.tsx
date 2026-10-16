@@ -1,69 +1,93 @@
-import { ChevronLeftIcon, ChevronRightIcon, CircleCheckIcon, CircleIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { connection } from "next/server";
+import { Suspense } from "react";
 
-import { PageHeader } from "@/components/layout/page-header";
-import { LinearProgress } from "@/components/progress/linear-progress";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { sampleCommitments, sampleMonth, sampleToday } from "@/lib/sample-data";
+import type { CalendarView as ViewType } from "@myc/types";
+import { getCalendarData } from "@myc/utils";
 
-import { MonthHeatmap } from "./_components/month-heatmap";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Calendar" };
+import { CalendarView } from "./_components/calendar-view";
 
-export default function CalendarPage() {
-  const active = sampleCommitments.filter((commitment) => commitment.status === "active");
+export const metadata: Metadata = {
+  title: "Calendar",
+  description: "Contribution calendar, month, week, and day consistency views.",
+};
+
+interface CalendarPageProps {
+  searchParams: Promise<{
+    view?: string;
+    date?: string;
+    filter?: string;
+    year?: string;
+    month?: string;
+  }>;
+}
+
+function CalendarLoadingFallback() {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-4 w-28" />
+        <Skeleton className="h-9 w-72" />
+        <Skeleton className="h-5 w-96 max-w-full" />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-10 w-64 rounded-full" />
+        <Skeleton className="h-10 w-48 rounded-xl" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-stack lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-2xl" />
+        ))}
+      </div>
+
+      <Card className="p-6">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <Skeleton key={i} className="h-52 rounded-xl" />
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+async function CalendarDataLoader({ searchParams }: CalendarPageProps) {
+  await connection();
+  const params = await searchParams;
+
+  const view = (params.view as ViewType) || "year";
+  const date = params.date;
+  const filter = params.filter || "all";
+  const year = params.year ? Number(params.year) : undefined;
+  const month = params.month ? Number(params.month) : undefined;
+
+  const supabase = await createClient();
+  const data = await getCalendarData(supabase, {
+    view,
+    date,
+    filterCommitmentId: filter,
+    year,
+    month,
+  });
 
   return (
-    <>
-      <PageHeader
-        eyebrow="Calendar"
-        title="Your consistency, day by day"
-        description="Every shaded day is a day you showed up. Darker means more got done."
-      />
+    <CalendarView
+      key={`${data.view}-${data.selectedDate}-${data.filterCommitmentId}`}
+      initialData={data}
+    />
+  );
+}
 
-      <div className="grid gap-stack lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <Card>
-          <CardHeader className="items-center">
-            <h2 className="type-h2">{sampleMonth.title}</h2>
-            <div className="flex gap-1.5">
-              <Button variant="secondary" size="icon-sm" aria-label="Previous month">
-                <ChevronLeftIcon />
-              </Button>
-              <Button variant="secondary" size="icon-sm" aria-label="Next month">
-                <ChevronRightIcon />
-              </Button>
-            </div>
-          </CardHeader>
-          <MonthHeatmap {...sampleMonth} />
-        </Card>
-
-        <Card className="self-start">
-          <CardHeader>
-            <div className="grid gap-0.5">
-              <p className="type-eyebrow text-primary-soft-foreground">Today</p>
-              <CardTitle className="type-h2">16 October</CardTitle>
-              <CardDescription>
-                {sampleToday.done} of {sampleToday.total} commitments
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <LinearProgress value={sampleToday.percent} label="Completed on 16 October" size="sm" />
-          <ul className="grid gap-3 pt-2">
-            {active.map((commitment) => (
-              <li key={commitment.id} className="flex items-center gap-3 type-small">
-                {commitment.doneToday ? (
-                  <CircleCheckIcon aria-hidden className="size-5 fill-primary text-card" />
-                ) : (
-                  <CircleIcon aria-hidden className="size-5 text-input" strokeWidth={1.75} />
-                )}
-                <span className="flex-1 font-medium">{commitment.title}</span>
-                <span className="sr-only">{commitment.doneToday ? "done" : "not done"}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-    </>
+export default function CalendarPage(props: CalendarPageProps) {
+  return (
+    <Suspense fallback={<CalendarLoadingFallback />}>
+      <CalendarDataLoader {...props} />
+    </Suspense>
   );
 }

@@ -74,25 +74,24 @@ Packages never import from apps, and `packages/utils` never imports platform API
 
 ## 4. Web — `apps/web`
 
-| Concern             | Implementation                                                                                                                                                  |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Framework           | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                                                                                  |
-| Styling             | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans                                                                            |
-| Components          | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn)                                                                |
-| Motion              | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17)                                                                |
-| App shell           | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error                                                                        |
-| Routes              | `/dashboard` (live Supabase stream via Consistency Engine), `/commitments` (live stream, active/paused/archived tabs), `/onboarding` (4-step onboarding wizard) |
-| Sample Routes       | `/calendar`, `/analytics`: static samples (D-18) until Tasks 10–12                                                                                              |
-| Authentication      | `src/app/(auth)/` (login, signup, verify-email, forgot-password, reset-password), `src/app/auth/callback/route.ts`                                              |
-| Profile & Security  | `src/app/(app)/settings/`: timezone selection (`ProfileSettingsSection`), Google linking & passwords (`AccountSecuritySection`)                                 |
-| Route Guard / Proxy | `src/proxy.ts` (Next 16 proxy) — session refresh, route boundaries, and unverified email redirection (D-20)                                                     |
-| Supabase (browser)  | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                                                                                  |
-| Supabase (server)   | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only`                                                                |
-| Env                 | `src/lib/env.ts` — validated lazily when a client is created                                                                                                    |
-| PWA                 | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`                                                                           |
-| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                                                                               |
-| Dev diagnostics     | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                                                                                     |
-| Component gallery   | `src/app/(app)/dev/ui/` — every component and state, 404 in production                                                                                          |
+| Concern             | Implementation                                                                                                                                                                                                                                                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework           | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                                                                                                                                                                                                                                               |
+| Styling             | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans                                                                                                                                                                                                                                         |
+| Components          | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn)                                                                                                                                                                                                                             |
+| Motion              | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17)                                                                                                                                                                                                                             |
+| App shell           | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error                                                                                                                                                                                                                                     |
+| Routes              | `/dashboard` (live Supabase stream via Consistency Engine), `/commitments` (live stream, active/paused/archived tabs), `/onboarding` (4-step onboarding wizard), `/calendar` (4-view calendar with contribution intensity and live completion toggles), `/analytics` (metric cards, period switcher, and performance charts) |
+| Authentication      | `src/app/(auth)/` (login, signup, verify-email, forgot-password, reset-password), `src/app/auth/callback/route.ts`                                                                                                                                                                                                           |
+| Profile & Security  | `src/app/(app)/settings/`: timezone selection (`ProfileSettingsSection`), Google linking & passwords (`AccountSecuritySection`)                                                                                                                                                                                              |
+| Route Guard / Proxy | `src/proxy.ts` (Next 16 proxy) — session refresh, route boundaries, and unverified email redirection (D-20)                                                                                                                                                                                                                  |
+| Supabase (browser)  | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                                                                                                                                                                                                                                               |
+| Supabase (server)   | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only`                                                                                                                                                                                                                             |
+| Env                 | `src/lib/env.ts` — validated lazily when a client is created                                                                                                                                                                                                                                                                 |
+| PWA                 | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`                                                                                                                                                                                                                                        |
+| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                                                                                                                                                                                                                                            |
+| Dev diagnostics     | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                                                                                                                                                                                                                                                  |
+| Component gallery   | `src/app/(app)/dev/ui/` — every component and state, 404 in production                                                                                                                                                                                                                                                       |
 
 Layout breakpoints: phone (< 768px) has a compact header, single column and a bottom bar with
 the four main sections (Settings in the header); tablet (768–1023px) has a labelled icon rail;
@@ -118,25 +117,25 @@ plugin that reads the signed-in user's data through Supabase — never a separat
 
 ## 6. Backend — Supabase
 
-| Concern        | Implementation                                                                                        |
-| -------------- | ----------------------------------------------------------------------------------------------------- |
-| Schema         | Only SQL migrations in `supabase/migrations/` define it ([supabase/README.md](../supabase/README.md)) |
-| RLS guardrail  | `ensure_rls` event trigger enables RLS on every new `public` table and fails closed                   |
-| Tests          | pgTAP in `supabase/tests/database/`, run with `npm run db:test` (31 tests passing)                    |
-| Types          | `npm run db:types` → `packages/types/src/database.ts`                                                 |
-| Edge Functions | `supabase/functions/` (none yet) — the only place the service-role key may be used                    |
-| Auth           | Supabase Auth (Email/Password + Google OAuth, linking, verification)                                  |
-| Profiles       | `profiles` table: timezone persistence, immutable `myc_started_at`, `ensure_profile` RPC              |
-| Commitments    | `commitments` table: CRUD, lifecycle, atomic `confirm_first_commitment` RPC                           |
-| Completions    | `daily_completions` table: idempotent `complete_commitment` & `uncomplete_commitment` RPCs            |
-| Realtime       | Enabled; used where live sync helps (e.g. completion state across devices) — _planned_                |
+| Concern        | Implementation                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema         | Only SQL migrations in `supabase/migrations/` define it ([supabase/README.md](../supabase/README.md))                                       |
+| RLS guardrail  | `ensure_rls` event trigger enables RLS on every new `public` table and fails closed                                                         |
+| Tests          | pgTAP in `supabase/tests/database/`, run with `npm run db:test` (36 tests passing)                                                          |
+| Types          | `npm run db:types` → `packages/types/src/database.ts`                                                                                       |
+| Edge Functions | `supabase/functions/` (none yet) — the only place the service-role key may be used                                                          |
+| Auth           | Supabase Auth (Email/Password + Google OAuth, linking, verification)                                                                        |
+| Profiles       | `profiles` table: timezone persistence, immutable `myc_started_at`, `ensure_profile` RPC                                                    |
+| Commitments    | `commitments` table: CRUD, lifecycle, atomic `confirm_first_commitment` RPC                                                                 |
+| Completions    | `daily_completions` table: immutable records, `complete_commitment` RPC with optional comment, RLS & statement trigger reject DELETE/UPDATE |
+| Realtime       | Enabled; subscribed on `daily_completions` across Web views (Calendar, Dashboard, Commitments) for instant multi-device sync                |
 
 ### Data model (PRD §33)
 
 ```text
 auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first "I COMMIT", timezone)  [Implemented]
             ├─ 1:n ─ commitments       (title, schedule/frequency, status lifecycle)           [Implemented]
-            └─ 1:n ─ daily_completions (commitment_id, date, status, completed_at)             [Implemented]
+            └─ 1:n ─ daily_completions (commitment_id, date, status, comment, completed_at)    [Implemented]
                                         unique (user_id, commitment_id, date)
 ```
 
@@ -148,6 +147,9 @@ auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first 
   `tr_protect_profile_fields`; first commitment activation outside "I COMMIT" is rejected by
   `tr_check_commitment_rules`; completions are guarded by `tr_check_daily_completion_rules`
   which blocks future dates, dates before `myc_started_at`, inactive commitments, and unscheduled weekdays.
+- Completions are immutable: once submitted, they represent permanent historical records. Direct `UPDATE`
+  and `DELETE` by authenticated/anon roles are blocked by trigger `tr_protect_daily_completion_immutability`,
+  and `uncomplete_commitment` is permanently disabled.
 - Streaks and consistency are computed centrally by the pure Consistency Engine (`packages/utils/src/consistency.ts`, D-26)
   from immutable database records, ensuring identical results across Web, PWA, and Mobile.
 

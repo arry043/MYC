@@ -7,6 +7,7 @@ import {
   CalendarIcon,
   CheckIcon,
   CircleIcon,
+  HistoryIcon,
   MoreVerticalIcon,
   PauseIcon,
   PencilIcon,
@@ -15,8 +16,8 @@ import {
   SparklesIcon,
   Trash2Icon,
 } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import type {
   Commitment,
@@ -25,14 +26,11 @@ import type {
   DailyCompletion,
   Profile,
 } from "@myc/types";
-import {
-  completeCommitment,
-  formatFrequency,
-  isCommitmentExpectedOnDate,
-  uncompleteCommitment,
-} from "@myc/utils";
+import { formatFrequency, isCommitmentExpectedOnDate } from "@myc/utils";
 
 import { CommitmentDialog } from "@/components/commitments/commitment-dialog";
+import { CommitmentHistoryDialog } from "@/components/commitments/commitment-history-dialog";
+import { CompleteCommitmentDialog } from "@/components/commitments/complete-commitment-dialog";
 import { DeleteCommitmentDialog } from "@/components/commitments/delete-commitment-dialog";
 import { PageHeader } from "@/components/layout/page-header";
 import { Stagger, StaggerItem } from "@/components/shared/motion";
@@ -71,6 +69,7 @@ export function CommitmentsView({
   initialTodayCompletions,
   todayDate,
 }: CommitmentsViewProps) {
+  const router = useRouter();
   const [commitments, setCommitments] = useState<Commitment[]>(initialCommitments);
   const [profile, setProfile] = useState<Profile | null>(initialProfile);
   const [todayCompletions, setTodayCompletions] = useState<DailyCompletion[]>(
@@ -83,9 +82,34 @@ export function CommitmentsView({
   const [editingCommitment, setEditingCommitment] = useState<Commitment | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCommitment, setDeletingCommitment] = useState<Commitment | null>(null);
+  const [completingCommitment, setCompletingCommitment] = useState<Commitment | null>(null);
+  const [historyCommitment, setHistoryCommitment] = useState<Commitment | null>(null);
 
   const hasStartedMyc = Boolean(profile?.myc_started_at);
   const isFirstCommitmentFlow = !hasStartedMyc;
+
+  // Realtime subscription for cross-device sync
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("commitments:daily_completions")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "daily_completions",
+        },
+        () => {
+          router.refresh();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [router]);
 
   const filteredCommitments = commitments.filter((c) => c.status === filter);
 
@@ -170,47 +194,9 @@ export function CommitmentsView({
 
   const effectiveToday = todayDate || new Date().toISOString().slice(0, 10);
 
-  const handleToggleCompletion = async (commitmentId: string) => {
-    const isDone = todayCompletions.some(
-      (c) => c.commitment_id === commitmentId && c.date === effectiveToday,
-    );
-    const supabase = createClient();
-
-    const prevComps = [...todayCompletions];
-    if (!isDone) {
-      const mockComp: DailyCompletion = {
-        id: `opt-${Date.now()}`,
-        user_id: profile?.user_id || "",
-        commitment_id: commitmentId,
-        date: effectiveToday,
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
-      setTodayCompletions([...todayCompletions, mockComp]);
-      const { data, error } = await completeCommitment(supabase, commitmentId, effectiveToday);
-      if (error) {
-        setTodayCompletions(prevComps);
-        toast({ title: "Could not mark done", description: error, tone: "error" });
-      } else if (data) {
-        setTodayCompletions((prev) =>
-          prev.map((c) =>
-            c.commitment_id === commitmentId && c.date === effectiveToday ? data : c,
-          ),
-        );
-      }
-    } else {
-      setTodayCompletions(
-        todayCompletions.filter(
-          (c) => !(c.commitment_id === commitmentId && c.date === effectiveToday),
-        ),
-      );
-      const { error } = await uncompleteCommitment(supabase, commitmentId, effectiveToday);
-      if (error) {
-        setTodayCompletions(prevComps);
-        toast({ title: "Could not undo", description: error, tone: "error" });
-      }
-    }
+  const handleCompletionSuccess = (completion: DailyCompletion) => {
+    setTodayCompletions((prev) => [...prev, completion]);
+    router.refresh();
   };
 
   return (
@@ -247,63 +233,55 @@ export function CommitmentsView({
               },
             ]}
             value={filter}
-            onValueChange={(val) => setFilter(val as "active" | "paused" | "archived")}
+            onValueChange={(val) => setFilter(val as typeof filter)}
           />
 
-          {!hasStartedMyc && (
-            <Link
-              href="/onboarding"
-              className="inline-flex items-center gap-1.5 type-small font-medium text-primary hover:underline"
-            >
-              <SparklesIcon className="size-4" />
-              View onboarding guide
-            </Link>
-          )}
+          <p className="type-caption text-muted-foreground">
+            {commitments.length} total commitment{commitments.length === 1 ? "" : "s"}
+          </p>
         </div>
 
-        {/* Empty state when user hasn't confirmed first commitment */}
-        {!hasStartedMyc && commitments.length === 0 && (
-          <Card className="gap-6 p-8 text-center sm:p-12">
-            <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary-soft-foreground shadow-raised">
+        {/* Empty state: No commitments at all */}
+        {commitments.length === 0 && (
+          <Card className="flex flex-col items-center justify-center gap-4 p-12 text-center">
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary">
               <SparklesIcon className="size-7" />
             </div>
-            <div className="mx-auto grid max-w-md gap-2">
-              <h2 className="type-h2">You haven&apos;t started your MYC journey yet</h2>
-              <p className="type-body text-muted-foreground">
-                Your journey officially begins when you define and confirm your first commitment
-                through &ldquo;I COMMIT&rdquo;.
+            <div className="flex max-w-md flex-col gap-1.5">
+              <CardTitle className="type-h3">
+                {isFirstCommitmentFlow
+                  ? "Define your first commitment"
+                  : "No commitments in this view"}
+              </CardTitle>
+              <p className="type-small text-muted-foreground">
+                {isFirstCommitmentFlow
+                  ? "Start with one small, realistic daily action. When you confirm your commitment, your MYC journey officially begins."
+                  : "Create a new commitment to keep building your consistency."}
               </p>
             </div>
-            <div className="flex justify-center gap-3">
-              <Button
-                size="lg"
-                onClick={handleOpenCreate}
-                className="font-semibold shadow-floating"
-              >
-                Make your first commitment
-              </Button>
-            </div>
+            <Button onClick={handleOpenCreate} size="lg" className="mt-2">
+              <PlusIcon />
+              {isFirstCommitmentFlow ? "Begin my first commitment" : "New commitment"}
+            </Button>
           </Card>
         )}
 
-        {/* Empty state for current tab when user has commitments */}
-        {(hasStartedMyc || commitments.length > 0) && filteredCommitments.length === 0 && (
-          <Card className="gap-4 p-8 text-center sm:p-10">
+        {/* Empty state: Filter returned nothing */}
+        {commitments.length > 0 && filteredCommitments.length === 0 && (
+          <Card className="flex flex-col items-center justify-center gap-2 p-10 text-center">
             <p className="type-h3">No {filter} commitments</p>
             <p className="type-small text-muted-foreground">
-              {filter === "active"
-                ? "You have no active commitments. Resume a paused one or create a new commitment."
-                : filter === "paused"
-                  ? "You have no paused commitments. Pausing is a healthy way to hold a commitment without breaking consistency."
-                  : "You have no archived commitments."}
+              You don&apos;t have any commitments with status &quot;{filter}&quot;.
             </p>
-            {filter === "active" && (
-              <div className="pt-2">
-                <Button variant="secondary" onClick={handleOpenCreate}>
-                  <PlusIcon />
-                  Add a commitment
-                </Button>
-              </div>
+            {filter !== "active" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFilter("active")}
+                className="mt-2"
+              >
+                View active commitments
+              </Button>
             )}
           </Card>
         )}
@@ -368,6 +346,11 @@ export function CommitmentsView({
                             <MoreVerticalIcon className="size-4" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setHistoryCommitment(commitment)}>
+                              <HistoryIcon className="size-4" />
+                              View history
+                            </DropdownMenuItem>
+
                             <DropdownMenuItem onClick={() => handleOpenEdit(commitment)}>
                               <PencilIcon className="size-4" />
                               Edit commitment
@@ -438,35 +421,44 @@ export function CommitmentsView({
                         Started {commitment.start_date}
                       </span>
 
-                      {commitment.status === "active" &&
-                        (isScheduledToday ? (
-                          <button
-                            type="button"
-                            onClick={() => handleToggleCompletion(commitment.id)}
-                            className={cn(
-                              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 type-caption font-semibold transition-all duration-150 outline-none focus-visible:ring-4 focus-visible:ring-ring/30",
-                              isDoneToday
-                                ? "bg-mint text-mint-foreground hover:opacity-90"
-                                : "border border-input bg-card text-foreground/80 hover:border-foreground/40",
-                            )}
-                          >
-                            {isDoneToday ? (
-                              <>
+                      <div className="flex items-center gap-2">
+                        {commitment.status === "active" &&
+                          (isScheduledToday ? (
+                            isDoneToday ? (
+                              <div
+                                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-600"
+                                aria-label={`"${commitment.title}" completed for today`}
+                              >
                                 <CheckIcon className="size-3.5 stroke-[2.5]" />
-                                <span>Done today</span>
-                              </>
+                                <span>Done</span>
+                              </div>
                             ) : (
-                              <>
+                              <button
+                                type="button"
+                                onClick={() => setCompletingCommitment(commitment)}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-input bg-card px-2.5 py-1 type-caption font-semibold text-foreground/80 transition-all duration-150 outline-none hover:border-foreground/40 focus-visible:ring-4 focus-visible:ring-ring/30"
+                              >
                                 <CircleIcon className="size-3 text-muted-foreground" />
                                 <span>Mark done</span>
-                              </>
-                            )}
-                          </button>
-                        ) : (
-                          <span className="type-caption text-muted-foreground/75">
-                            Not scheduled today
-                          </span>
-                        ))}
+                              </button>
+                            )
+                          ) : (
+                            <span className="type-caption text-muted-foreground/75">
+                              Not scheduled today
+                            </span>
+                          ))}
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => setHistoryCommitment(commitment)}
+                          aria-label={`View history for ${commitment.title}`}
+                          title="View commitment history"
+                        >
+                          <HistoryIcon className="size-3.5 text-muted-foreground" />
+                        </Button>
+                      </div>
                     </div>
                   </Card>
                 </StaggerItem>
@@ -510,6 +502,26 @@ export function CommitmentsView({
         onOpenChange={setDeleteDialogOpen}
         commitment={deletingCommitment}
         onDeleted={handleCommitmentDeleted}
+      />
+
+      {/* Complete Commitment Confirmation Dialog */}
+      <CompleteCommitmentDialog
+        isOpen={Boolean(completingCommitment)}
+        onClose={() => setCompletingCommitment(null)}
+        commitment={completingCommitment}
+        date={effectiveToday}
+        onSuccess={(completion) => {
+          handleCompletionSuccess(completion);
+          setCompletingCommitment(null);
+        }}
+      />
+
+      {/* Commitment History Dialog */}
+      <CommitmentHistoryDialog
+        isOpen={Boolean(historyCommitment)}
+        onClose={() => setHistoryCommitment(null)}
+        commitment={historyCommitment}
+        timezone={profile?.timezone || "UTC"}
       />
     </>
   );

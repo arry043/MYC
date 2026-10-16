@@ -1,15 +1,9 @@
 "use client";
 
-import {
-  CalendarCheck2Icon,
-  FlameIcon,
-  PlusIcon,
-  SproutIcon,
-  TargetIcon,
-  TrophyIcon,
-} from "lucide-react";
+import { FlameIcon, PlusIcon, SproutIcon, TargetIcon, TrophyIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import type {
   Commitment,
@@ -18,12 +12,7 @@ import type {
   DailyCompletion,
   Profile,
 } from "@myc/types";
-import {
-  calculateConsistencyMetrics,
-  completeCommitment,
-  getDateRange,
-  uncompleteCommitment,
-} from "@myc/utils";
+import { calculateConsistencyMetrics, getDateRange } from "@myc/utils";
 
 import { PageHeader, PageSection } from "@/components/layout/page-header";
 import { ColumnChart } from "@/components/progress/column-chart";
@@ -33,7 +22,6 @@ import { Stagger, StaggerItem } from "@/components/shared/motion";
 import { StatCard } from "@/components/shared/stat-card";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
 
 import { TodayList } from "./today-list";
@@ -55,9 +43,33 @@ export function DashboardView({
   initialProfile,
   todayDate,
 }: DashboardViewProps) {
+  const router = useRouter();
   const [metrics, setMetrics] = useState<ConsistencyMetrics>(initialMetrics);
   const [todayItems, setTodayItems] = useState<DailyCommitmentItem[]>(initialTodayItems);
   const [completions, setCompletions] = useState<DailyCompletion[]>(allCompletions);
+
+  // Realtime subscription for cross-device sync
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel("dashboard:daily_completions")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "daily_completions",
+        },
+        () => {
+          router.refresh();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [router]);
 
   // Compute journey day number
   let journeyDay = 1;
@@ -66,45 +78,19 @@ export function DashboardView({
     journeyDay = Math.max(1, days.length);
   }
 
-  // Handle completion toggle
-  const handleToggle = async (commitmentId: string) => {
-    const currentItem = todayItems.find((i) => i.commitment.id === commitmentId);
-    if (!currentItem) return;
-
-    const willBeCompleted = !currentItem.isCompleted;
-    const supabase = createClient();
-
-    // Optimistic update
-    const previousTodayItems = [...todayItems];
-    const previousCompletions = [...completions];
-    const previousMetrics = { ...metrics };
-
-    let updatedCompletions: DailyCompletion[];
-    if (willBeCompleted) {
-      const mockComp: DailyCompletion = {
-        id: `opt-${Date.now()}`,
-        user_id: currentItem.commitment.user_id,
-        commitment_id: commitmentId,
-        date: todayDate,
-        status: "completed",
-        completed_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-      };
-      updatedCompletions = [...completions, mockComp];
-    } else {
-      updatedCompletions = completions.filter(
-        (c) => !(c.commitment_id === commitmentId && c.date === todayDate),
-      );
-    }
-
+  // Handle permanent completion submission from TodayList dialog
+  const handleCompletionSuccess = (completion: DailyCompletion) => {
+    const updatedCompletions = [...completions, completion];
     setCompletions(updatedCompletions);
+
     setTodayItems((prev) =>
       prev.map((item) =>
-        item.commitment.id === commitmentId
+        item.commitment.id === completion.commitment_id
           ? {
               ...item,
-              isCompleted: willBeCompleted,
-              completedAt: willBeCompleted ? new Date().toISOString() : null,
+              isCompleted: true,
+              completedAt: completion.completed_at,
+              comment: completion.comment,
             }
           : item,
       ),
@@ -120,41 +106,8 @@ export function DashboardView({
     });
     setMetrics(nextMetrics);
 
-    // Execute server RPC
-    if (willBeCompleted) {
-      const { data, error } = await completeCommitment(supabase, commitmentId, todayDate);
-      if (error) {
-        // Rollback
-        setTodayItems(previousTodayItems);
-        setCompletions(previousCompletions);
-        setMetrics(previousMetrics);
-        toast({
-          title: "Could not complete commitment",
-          description: error,
-          tone: "error",
-        });
-        return;
-      }
-      if (data) {
-        setCompletions((prev) =>
-          prev.map((c) => (c.commitment_id === commitmentId && c.date === todayDate ? data : c)),
-        );
-      }
-    } else {
-      const { error } = await uncompleteCommitment(supabase, commitmentId, todayDate);
-      if (error) {
-        // Rollback
-        setTodayItems(previousTodayItems);
-        setCompletions(previousCompletions);
-        setMetrics(previousMetrics);
-        toast({
-          title: "Could not uncomplete commitment",
-          description: error,
-          tone: "error",
-        });
-        return;
-      }
-    }
+    // Refresh server data
+    router.refresh();
   };
 
   // Build last 7 days chart data
@@ -189,144 +142,142 @@ export function DashboardView({
       return { label: dayOfWeek, value: 0, highlight: idx === 6 };
     }
 
-    const completed = expected.filter((c) =>
-      compsOnDate.some((comp) => comp.commitment_id === c.id),
-    ).length;
-    const pct = Math.round((completed / expected.length) * 100);
-    return { label: dayOfWeek, value: pct, highlight: idx === 6 };
+    const pct = Math.round((compsOnDate.length / expected.length) * 100);
+    return {
+      label: dayOfWeek,
+      value: Math.min(100, pct),
+      highlight: idx === 6,
+    };
   });
 
-  const todaySummary = metrics.today;
-  const todayPercent = todaySummary.percentage ?? 0;
   const hasStartedJourney = Boolean(initialProfile?.myc_started_at);
+  const todayPercentage = metrics.today.percentage ?? 0;
 
   return (
     <>
       <PageHeader
-        eyebrow="Today"
-        title="Welcome back"
-        description="Small actions, repeated. Here's where today stands."
+        eyebrow="Dashboard"
+        title="Show up today."
+        description="One day at a time. Consistency compounds into identity."
         actions={
-          <>
-            <Link
-              href="/calendar"
-              className={buttonVariants({ variant: "secondary", className: "max-sm:flex-1" })}
-            >
-              View calendar
-            </Link>
-            <Link href="/commitments" className={buttonVariants({ className: "max-sm:flex-1" })}>
-              <PlusIcon className="size-4" />
-              New commitment
-            </Link>
-          </>
+          <Link
+            href="/commitments"
+            className={buttonVariants({ variant: "secondary", size: "sm" })}
+          >
+            <PlusIcon />
+            Manage commitments
+          </Link>
         }
       />
 
-      <div className="grid gap-stack lg:grid-cols-5">
-        <Card className="lg:col-span-3">
-          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:gap-8">
-            <ProgressRing value={todayPercent} label="Today's progress" size={148} strokeWidth={12}>
-              <span className="type-metric">{todayPercent}%</span>
-              <span className="type-caption text-muted-foreground">today</span>
-            </ProgressRing>
-            <div className="grid w-full gap-4">
-              <div className="grid gap-1 text-center sm:text-left">
-                <p className="type-eyebrow text-muted-foreground">Today&apos;s progress</p>
-                <p className="type-h2">
-                  {todaySummary.expected > 0
-                    ? `${todaySummary.completed} of ${todaySummary.expected} commitments done`
-                    : "No commitments scheduled today"}
-                </p>
-                <p className="type-small text-muted-foreground">
-                  {todaySummary.expected === 0
-                    ? "Enjoy your open schedule or plan ahead."
-                    : todaySummary.completed === todaySummary.expected
-                      ? "All done for today. Consistency at its best!"
-                      : todaySummary.completed === 0
-                        ? "Ready when you are. Showing up is what counts."
-                        : `${todaySummary.expected - todaySummary.completed} left. A few focused minutes is enough.`}
-                </p>
-              </div>
-              <LinearProgress value={todayPercent} label="Commitments completed today" size="sm" />
-            </div>
-          </div>
-        </Card>
-
-        <Card tone="lavender" className="justify-between lg:col-span-2">
-          <CardHeader>
-            <div className="grid gap-1">
-              <p className="type-eyebrow text-lavender-foreground">Your MYC journey</p>
-              <p className="type-display">
-                {hasStartedJourney ? `Day ${journeyDay}` : "Not started"}
-              </p>
-            </div>
-            <span
-              aria-hidden
-              className="grid size-11 place-content-center rounded-2xl bg-card/70 text-lavender-foreground"
-            >
-              <SproutIcon className="size-5" />
-            </span>
-          </CardHeader>
-          <p className="type-small text-foreground/75">
-            {hasStartedJourney
-              ? `You committed on ${initialProfile?.myc_started_at}. Miss once? Come back tomorrow.`
-              : 'Begin by defining your first commitment and confirming "I COMMIT".'}
-          </p>
-        </Card>
-      </div>
-
-      <Stagger className="grid grid-cols-2 gap-stack xl:grid-cols-4">
+      {/* Hero Stats */}
+      <Stagger className="grid grid-cols-2 gap-stack lg:grid-cols-4">
         <StaggerItem>
           <StatCard
             label="Current streak"
-            value={hasStartedJourney ? String(metrics.currentStreak) : "—"}
-            unit={hasStartedJourney ? "days" : undefined}
+            value={String(hasStartedJourney ? metrics.currentStreak : 0)}
+            unit="days"
+            tone="sun"
             icon={FlameIcon}
-            tone="peach"
-            footer={
-              <span className="type-caption text-muted-foreground">
-                {metrics.currentStreak > 0 ? "Keep it going today" : "Showing up counts"}
-              </span>
-            }
           />
         </StaggerItem>
+
         <StaggerItem>
           <StatCard
             label="Best streak"
-            value={hasStartedJourney ? String(metrics.bestStreak) : "—"}
-            unit={hasStartedJourney ? "days" : undefined}
+            value={String(hasStartedJourney ? metrics.bestStreak : 0)}
+            unit="days"
+            tone="lavender"
             icon={TrophyIcon}
-            tone="sun"
-            footer={<span className="type-caption text-muted-foreground">Personal best</span>}
           />
         </StaggerItem>
+
         <StaggerItem>
           <StatCard
-            label="Consistent days"
-            value={hasStartedJourney ? String(metrics.consistentDays) : "—"}
-            icon={CalendarCheck2Icon}
-            tone="mint"
-            footer={<span className="type-caption text-muted-foreground">100% completed days</span>}
-          />
-        </StaggerItem>
-        <StaggerItem>
-          <StatCard
-            label="Overall"
+            label="Overall consistency"
             value={
               hasStartedJourney && metrics.overallPercentage !== null
                 ? `${metrics.overallPercentage}%`
                 : "—"
             }
-            icon={TargetIcon}
             tone="sky"
-            footer={
-              <span className="type-caption text-muted-foreground">
-                {metrics.overallPercentage !== null
-                  ? `${metrics.totalCompletedCommitmentDays} / ${metrics.totalExpectedCommitmentDays} done`
-                  : "Start to track"}
-              </span>
-            }
+            icon={TargetIcon}
           />
+        </StaggerItem>
+
+        <StaggerItem>
+          <StatCard
+            label="Journey day"
+            value={hasStartedJourney ? String(journeyDay) : "—"}
+            tone="mint"
+            icon={SproutIcon}
+          />
+        </StaggerItem>
+      </Stagger>
+
+      {/* Today's Focus Card */}
+      <Stagger className="grid gap-stack lg:grid-cols-3">
+        <StaggerItem className="lg:col-span-2">
+          <Card className="flex flex-col justify-between gap-6 p-6 sm:p-8">
+            <div className="flex flex-col gap-2">
+              <span className="type-caption font-bold tracking-wider text-muted-foreground uppercase">
+                Today&apos;s Focus
+              </span>
+              <CardTitle className="type-h2">
+                {metrics.today.expected === 0
+                  ? "No commitments scheduled today"
+                  : metrics.today.completed === metrics.today.expected
+                    ? "All commitments complete for today! 🎉"
+                    : `${metrics.today.completed} of ${metrics.today.expected} completed`}
+              </CardTitle>
+              <CardDescription className="text-base">
+                {metrics.today.expected === 0
+                  ? "Enjoy your rest day, or define a new commitment for today."
+                  : metrics.today.completed === metrics.today.expected
+                    ? "Outstanding consistency. Your streak for today is fully secured."
+                    : "Show up for yourself today. Every completed commitment counts."}
+              </CardDescription>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <div className="flex justify-between type-caption font-medium text-muted-foreground">
+                <span>Progress today</span>
+                <span>{todayPercentage}%</span>
+              </div>
+              <LinearProgress value={todayPercentage} label="Today's progress" />
+            </div>
+          </Card>
+        </StaggerItem>
+
+        <StaggerItem>
+          <Card className="flex flex-col items-center justify-center gap-4 p-6 text-center sm:p-8">
+            <ProgressRing
+              value={todayPercentage}
+              label="Today's consistency percentage ring"
+              size={140}
+              strokeWidth={12}
+            >
+              <span className="type-h2 font-bold tabular-nums">
+                {metrics.today.expected > 0 ? `${todayPercentage}%` : "—"}
+              </span>
+              <span className="type-caption text-muted-foreground">today</span>
+            </ProgressRing>
+
+            <div className="flex flex-col gap-1">
+              <p className="type-small font-semibold text-foreground">
+                {metrics.today.expected > 0
+                  ? `${metrics.today.completed} / ${metrics.today.expected} tasks`
+                  : "Unscheduled"}
+              </p>
+              <p className="type-caption text-muted-foreground">
+                {metrics.today.isConsistent
+                  ? "Today is a Consistent Day!"
+                  : metrics.today.expected > 0
+                    ? `${metrics.today.expected - metrics.today.completed} remaining`
+                    : "Take a break"}
+              </p>
+            </div>
+          </Card>
         </StaggerItem>
       </Stagger>
 
@@ -343,7 +294,9 @@ export function DashboardView({
           <TodayList
             items={todayItems}
             hasAnyCommitments={allCommitments.length > 0}
-            onToggle={handleToggle}
+            timezone={initialProfile?.timezone || "UTC"}
+            todayDate={todayDate}
+            onCompleteSuccess={handleCompletionSuccess}
           />
         </PageSection>
 
