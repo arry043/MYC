@@ -146,6 +146,37 @@ interactive component demos (toasts, dialog, loading button) are on the developm
 `/dev/ui` page. **Consequences:** tasks 05–12 swap these imports for real data and delete
 the module once it's unused.
 
+### D-19 · Supabase Auth with Email/Password + Google OAuth and Account Linking — 2026-10-16
+
+Task 04 requires production authentication with exactly Email/Password and Google OAuth, linkable
+to a single MYC identity without account duplication. **Decision:** use Supabase Auth with
+manual identity linking (`supabase.auth.linkIdentity`). Never merge accounts automatically on
+matching email alone to prevent account hijacking. Collisions require secure authentication to the
+existing account prior to linking. Google OAuth uses provider-verified email claims. Email/password
+accounts require email verification before accessing protected routes. Password setup/update is
+handled via `supabase.auth.updateUser`. **Consequences:** `supabase/config.toml` enables
+`enable_manual_linking = true`; `AccountSecuritySection` in Settings manages linking, unlinking, and
+password establishment.
+
+### D-20 · Next.js 16 Proxy for Session Interception and Route Guarding — 2026-10-16
+
+Next.js 16 replaces `middleware.ts` with `proxy.ts`. **Decision:** implement `src/proxy.ts` using
+`@supabase/ssr` `createServerClient` with `request.cookies.getAll()` and response cookie mirroring.
+Session verification uses `supabase.auth.getUser()` (never unverified `getSession()`). Protects
+`/dashboard`, `/calendar`, `/commitments`, `/analytics`, `/settings`, routing unauthenticated users
+to `/login` with sanitized `next` parameters, and unverified email users to `/verify-email`.
+**Consequences:** robust multi-device cookie persistence and route protection without client-side
+flashes.
+
+### D-21 · Mobile Deep Linking and AppState Token Refreshing — 2026-10-16
+
+Expo mobile authentication requires OAuth redirects and background-to-foreground session checks.
+**Decision:** configure `myc://auth/callback` deep link scheme and register URL event listeners
+via `expo-linking`. In `apps/mobile/src/lib/auth.ts`, hook into React Native `AppState` to
+automatically invoke `supabase.auth.startAutoRefresh()` when active and `stopAutoRefresh()` when
+in background. **Consequences:** reliable OAuth flow via system browser and clean token persistence
+via `expo-sqlite` localStorage adapter.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.
