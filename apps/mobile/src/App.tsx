@@ -11,7 +11,13 @@ import {
   View,
 } from "react-native";
 
-import { extractAuthIdentities, formatAuthError, isValidEmail, validatePassword } from "@myc/utils";
+import {
+  extractAuthIdentities,
+  formatAuthError,
+  getUserLocalDateString,
+  isValidEmail,
+  validatePassword,
+} from "@myc/utils";
 
 import { setupMobileAuth, signInWithGoogleMobile, signOutMobile } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
@@ -108,6 +114,7 @@ export default function App() {
     setCurrentUser(null);
     setProfile(null);
     setCommitments([]);
+    setTodayCompletions([]);
     setActionLoading(false);
   };
 
@@ -124,6 +131,7 @@ export default function App() {
       status: string;
     }[]
   >([]);
+  const [todayCompletions, setTodayCompletions] = useState<string[]>([]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -154,6 +162,16 @@ export default function App() {
       if (isMounted && commitmentsData) {
         setCommitments(commitmentsData);
       }
+
+      const localDate = getUserLocalDateString(tz);
+      const { data: compsData } = await supabase
+        .from("daily_completions")
+        .select("commitment_id")
+        .eq("date", localDate);
+
+      if (isMounted && compsData) {
+        setTodayCompletions(compsData.map((c) => c.commitment_id));
+      }
     };
 
     loadData();
@@ -162,6 +180,28 @@ export default function App() {
       isMounted = false;
     };
   }, [currentUser]);
+
+  const handleToggleCompletion = async (commitmentId: string) => {
+    const isDone = todayCompletions.includes(commitmentId);
+    const supabase = getSupabase();
+    if (!isDone) {
+      setTodayCompletions((prev) => [...prev, commitmentId]);
+      const { error } = await supabase.rpc("complete_commitment", {
+        p_commitment_id: commitmentId,
+      });
+      if (error) {
+        setTodayCompletions((prev) => prev.filter((id) => id !== commitmentId));
+      }
+    } else {
+      setTodayCompletions((prev) => prev.filter((id) => id !== commitmentId));
+      const { error } = await supabase.rpc("uncomplete_commitment", {
+        p_commitment_id: commitmentId,
+      });
+      if (error) {
+        setTodayCompletions((prev) => [...prev, commitmentId]);
+      }
+    }
+  };
 
   const identitiesSummary = extractAuthIdentities(currentUser);
 
@@ -220,24 +260,47 @@ export default function App() {
                 No commitments yet. Create your first commitment on Web or Mobile to begin.
               </Text>
             ) : (
-              commitments.map((c) => (
-                <View key={c.id} style={styles.commitmentItem}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.commitmentTitle}>{c.title}</Text>
-                    <Text style={styles.commitmentFreq}>
-                      {c.frequency === "daily" ? "Every day" : "Scheduled days"}
-                    </Text>
+              commitments.map((c) => {
+                const isDone = todayCompletions.includes(c.id);
+                return (
+                  <View key={c.id} style={styles.commitmentItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.commitmentTitle}>{c.title}</Text>
+                      <Text style={styles.commitmentFreq}>
+                        {c.frequency === "daily" ? "Every day" : "Scheduled days"}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      {c.status === "active" && (
+                        <Pressable
+                          onPress={() => handleToggleCompletion(c.id)}
+                          style={[
+                            styles.checkButton,
+                            isDone ? styles.checkButtonDone : styles.checkButtonPending,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.checkButtonText,
+                              isDone ? styles.checkTextDone : styles.checkTextPending,
+                            ]}
+                          >
+                            {isDone ? "✓ Done" : "Mark done"}
+                          </Text>
+                        </Pressable>
+                      )}
+                      <View
+                        style={[
+                          styles.statusPill,
+                          c.status === "active" ? styles.statusActive : styles.statusPaused,
+                        ]}
+                      >
+                        <Text style={styles.statusPillText}>{c.status}</Text>
+                      </View>
+                    </View>
                   </View>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      c.status === "active" ? styles.statusActive : styles.statusPaused,
-                    ]}
-                  >
-                    <Text style={styles.statusPillText}>{c.status}</Text>
-                  </View>
-                </View>
-              ))
+                );
+              })
             )}
           </View>
 
@@ -572,5 +635,29 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#2d3748",
     textTransform: "capitalize",
+  },
+  checkButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  checkButtonDone: {
+    backgroundColor: "#16a34a",
+    borderColor: "#16a34a",
+  },
+  checkButtonPending: {
+    backgroundColor: "#ffffff",
+    borderColor: "#cbd5e1",
+  },
+  checkButtonText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  checkTextDone: {
+    color: "#ffffff",
+  },
+  checkTextPending: {
+    color: "#475569",
   },
 });

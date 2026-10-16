@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import type { Commitment, Profile } from "@myc/types";
+import type { Commitment, DailyCompletion, Profile } from "@myc/types";
+import { getUserLocalDateString } from "@myc/utils";
 
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,10 +33,22 @@ async function CommitmentsDataLoader() {
     .select("*")
     .order("created_at", { ascending: false });
 
+  const profile = (profileData as Profile) || null;
+  const timezone = profile?.timezone || "UTC";
+  const todayDate = getUserLocalDateString(timezone);
+
+  // Fetch completions for today
+  const { data: completionsData } = await supabase
+    .from("daily_completions")
+    .select("*")
+    .eq("date", todayDate);
+
   return (
     <CommitmentsView
       initialCommitments={(commitmentsData as Commitment[]) || []}
-      initialProfile={(profileData as Profile) || null}
+      initialProfile={profile}
+      initialTodayCompletions={(completionsData as DailyCompletion[]) || []}
+      todayDate={todayDate}
     />
   );
 }

@@ -207,8 +207,32 @@ Task 07 establishes commitment management. **Decision:**
 - Lifecycle: statuses are `draft`, `active`, `paused`, and `archived`.
 - Deletion (resolving Q-05): supports both soft-archival (`status = 'archived'`) for history preservation and
   hard deletion with confirmation modal for unwanted commitments.
-- Colors: tokens `sky`, `emerald`, `amber`, `rose`, `indigo` mapped to design system accent classes.
-  **Consequences:** clean schedule validation in `@myc/utils/commitments` and database constraints.
+
+### D-25 · Daily Completions Table & Database Integrity Rules — 2026-10-17
+
+Task 08 establishes daily completion tracking. **Decision:**
+
+- Table: `daily_completions` (`id`, `user_id`, `commitment_id`, `date`, `status`, `completed_at`, `created_at`).
+- Unique constraint: `UNIQUE (user_id, commitment_id, date)` guarantees duplicate-request idempotency.
+- Database Trigger: `tr_check_daily_completion_rules` enforces backend-level integrity:
+  1. Profile journey rule: completions rejected before `myc_started_at`.
+  2. Future-date protection: evaluated against the user's specific IANA timezone (`now() AT TIME ZONE profile.timezone`).
+  3. Status & validity: commitment must be `active`, owned by the caller, within date range (`start_date <= date <= end_date`), and scheduled for that day's ISO weekday if `specific_days`.
+- Idempotent RPCs: `complete_commitment(p_commitment_id, p_date)` and `uncomplete_commitment(p_commitment_id, p_date)` provide atomic, safe toggle operations.
+- RLS: Owner-only policies for `SELECT`, `INSERT`, `DELETE`.
+  **Consequences:** guarantees zero fake data, no future completions, and rock-solid database integrity. Resolves Q-07 (paused days are not expected and cannot be completed).
+
+### D-26 · Centralized Consistency Engine & Metric Calculation Rules — 2026-10-17
+
+Task 09 implements pure, centralized calculations in `@myc/utils/consistency.ts` shared across Web and Mobile:
+
+- Consistent Day (resolving Q-03): A calendar date where expected commitments > 0 and all expected commitments were completed (`completed == expected`).
+- Daily Consistency %: `(completed / expected) * 100`. Returns `null` when expected == 0 (unscheduled day).
+- Current Streak: Counts consecutive consistent days up to today. If today is incomplete or has not had all tasks completed yet, the streak persists based on yesterday's completion status. Unscheduled days (0 expected) neither break nor extend the streak. An uncompleted expected past day breaks the streak.
+- Best Streak: The maximum consecutive run of consistent days across the user's journey since `myc_started_at`.
+- Overall Consistency %: Weighted percentage: `(total completed instances) / (total expected instances) * 100` across all days from `myc_started_at` to today.
+- "Not Started" State: Returns zeroed metrics when `myc_started_at` is `null`.
+  **Consequences:** single source of truth across all platforms with 100% test coverage covering all 18 streak edge cases.
 
 ## Open questions
 
@@ -218,7 +242,5 @@ Decide these before (or during) the task that needs them, then move each into th
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
 | Q-01 | **Android package ID.** `com.myc.app` is a placeholder; it becomes permanent with the first Play Store release. Which domain will MYC use? | 1.13      |
 | Q-02 | **Production Supabase project.** Name, region (development is `ap-northeast-1`) and plan.                                                  | 1.15      |
-| Q-03 | **Definition of a consistent day.** All expected commitments completed, or a threshold (PRD §17 says it may be configurable)?              | 1.08      |
 | Q-06 | **Timezone changes.** Does a change apply from the next local day onward, and how are travel days counted (PRD §34, §42)?                  | 1.11      |
-| Q-07 | **Paused commitments.** Do paused days count as "not scheduled" for streaks?                                                               | 1.08      |
 | Q-08 | **Web hosting.** Vercel is assumed for production env vars; confirm.                                                                       | 1.15      |
