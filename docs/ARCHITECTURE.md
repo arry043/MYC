@@ -4,7 +4,8 @@ How MYC is built and why. For the product itself see [PRD.md](PRD.md); for the r
 change must follow see [RULES.md](RULES.md); for the reasoning behind specific choices see
 [DECISIONS.md](DECISIONS.md).
 
-> **Current state:** foundation only (Phases 1.01–1.02 in [PHASES.md](PHASES.md)). Sections
+> **Current state:** foundation, design system and app shell (tasks 01–03 in
+> [PHASES.md](PHASES.md)); pages show static sample content. Sections
 > marked _Planned_ describe where future work goes, not code that exists today.
 
 ## 1. Principles
@@ -76,13 +77,22 @@ Packages never import from apps, and `packages/utils` never imports platform API
 | Concern            | Implementation                                                                                   |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | Framework          | Next.js 16.4 App Router, React 19.2, `cacheComponents` enabled                                   |
-| Styling            | Tailwind CSS 4 with shadcn/ui tokens (`src/app/globals.css`); components in `src/components/ui`  |
+| Styling            | Tailwind CSS 4; all design tokens in `src/app/globals.css` (D-16); Plus Jakarta Sans             |
+| Components         | `src/components/{ui,layout,navigation,progress,feedback,shared}`; primitives on Base UI (shadcn) |
+| Motion             | `motion` (Framer Motion); tokens in `src/lib/motion.ts`; honours `prefers-reduced-motion` (D-17) |
+| App shell          | Route group `src/app/(app)/`: layout (shell), template (page transition), loading, error         |
+| Routes             | `/dashboard`, `/calendar`, `/commitments`, `/analytics`, `/settings`: static samples (D-18)      |
 | Supabase (browser) | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                   |
 | Supabase (server)  | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only` |
 | Env                | `src/lib/env.ts` — validated lazily when a client is created                                     |
 | PWA                | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`            |
 | Security headers   | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                |
 | Dev diagnostics    | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                      |
+| Component gallery  | `src/app/(app)/dev/ui/` — every component and state, 404 in production                           |
+
+Layout breakpoints: phone (< 768px) has a compact header, single column and a bottom bar with
+the four main sections (Settings in the header); tablet (768–1023px) has a labelled icon rail;
+desktop (≥ 1024px) has a full sidebar. Spacing tokens shrink on smaller screens.
 
 _Planned:_ `src/proxy.ts` (Next 16's replacement for `middleware.ts`) to refresh Supabase auth
 sessions on each request; route groups for signed-in vs. public pages; a service worker for the

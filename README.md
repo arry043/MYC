@@ -6,7 +6,8 @@ contribution-style calendar, analytics and (on Android) a home-screen widget.
 
 > Don't rely on motivation. Build consistency.
 
-**Status:** foundation complete (project setup and Supabase backend). No product features yet.
+**Status:** foundation complete (project setup, Supabase backend, design system and app shell).
+The app pages show static sample content; no product features yet.
 See [docs/PHASES.md](docs/PHASES.md) for the roadmap.
 
 ## Documentation
@@ -193,6 +194,22 @@ npm run build:web     # production build
 
 PWA installability needs HTTPS (or `localhost`). To test install on another device, deploy
 over HTTPS or run `npx next dev --experimental-https` in `apps/web`.
+
+## Design system
+
+Every MYC screen uses the same tokens and components. Don't hard-code colours, sizes or shadows.
+
+| What               | Where (`apps/web/src/…`)                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| Tokens             | `app/globals.css`: colours, `type-*` text styles, spacing (`p-card`, `gap-section`…), radius, shadows, easing |
+| Motion tokens      | `lib/motion.ts` (Framer Motion, via the `motion` package)                                                     |
+| Primitives         | `components/ui/`: button, inputs, select, checkbox, switch, card, badge, alert, dialog, dropdown, toast…      |
+| Shell & navigation | `components/layout/`, `components/navigation/` (sidebar, tablet rail, phone bottom bar)                       |
+| Progress & charts  | `components/progress/`: ring, linear bar, column chart, metric indicator                                      |
+| States             | `components/feedback/`: empty, error, success, skeletons, page loading                                        |
+
+In development, **http://localhost:3000/dev/ui** shows every component and state (404 in
+production). Changing a token, e.g. `--primary`, restyles the whole app.
 
 ## Running the mobile app
 

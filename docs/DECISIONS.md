@@ -110,6 +110,42 @@ Supabase's Next.js quickstart adds middleware to refresh sessions. That only mat
 sign in. **Decision:** add it in task 1.03 as `src/proxy.ts` (Next.js 16 renamed
 `middleware.ts`). **Consequences:** the server client's cookie writes are ignored until then.
 
+### D-16 · Design tokens live in `globals.css`; web is the reference — 2026-10-16
+
+Task 03 asked for one place to change MYC's look. The visual reference image mentioned in the
+task brief was not available in the repo or conversation, so the system follows the brief's
+written direction: sky-blue primary, warm off-white background, white cards, restrained pastel
+accents (lavender, peach, mint, sun), soft shadows, one sans-serif family (Plus Jakarta Sans).
+**Decision:** every colour, `type-*` text style, semantic spacing step (`page`, `section`,
+`card`, `stack`; smaller on phones), radius, shadow and easing is a token in
+`apps/web/src/app/globals.css`; components use only semantic names. Text/surface pairs were
+checked for WCAG AA (≥ 4.5:1). Progress and intensity use one hue (sky, light → dark). shadcn
+components were restyled, not used with defaults. **Consequences:** the mobile app (task 14)
+should derive its theme from these values, moving them into a shared `packages/*` module
+then; until then, web is the source of truth. If the reference image turns up, compare
+against it and adjust the tokens.
+
+### D-17 · Framer Motion (`motion`) for animation; Base UI toast instead of Sonner — 2026-10-16
+
+**Decision:** `motion` (Framer Motion's current package name) handles page transitions,
+staggered entrances, progress fills and the shared-layout navigation indicator, with
+`MotionConfig reducedMotion="user"`. A global CSS rule shortens transitions when
+`prefers-reduced-motion` is set. Hover/press feedback uses CSS. Toasts are built on Base UI's
+`Toast` (already installed) rather than shadcn's Sonner, to avoid adding `sonner` and
+`next-themes`. **Consequences:** one new dependency (`motion`, web only); call `toast()` from
+`@/components/ui/toast`.
+
+### D-18 · Static sample content for the task-03 placeholder pages — 2026-10-16
+
+RULES §1 forbids demo data, while task 03 requires placeholder pages that demonstrate the
+design with static values. **Decision:** all sample values live in one module,
+`apps/web/src/lib/sample-data.ts`. It holds no logic and no database access, and each export
+notes the task that replaces it. Visual-only buttons (e.g. "New commitment") have no handlers.
+Actions that would need an account (sign out, delete account) are shown disabled. The
+interactive component demos (toasts, dialog, loading button) are on the development-only
+`/dev/ui` page. **Consequences:** tasks 05–12 swap these imports for real data and delete
+the module once it's unused.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.
