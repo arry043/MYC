@@ -177,6 +177,39 @@ automatically invoke `supabase.auth.startAutoRefresh()` when active and `stopAut
 in background. **Consequences:** reliable OAuth flow via system browser and clean token persistence
 via `expo-sqlite` localStorage adapter.
 
+### D-22 · Database-Enforced Profile Invariants & Timezone Persistence — 2026-10-17
+
+Tasks 05–06 mandate that account creation date is never the MYC journey start date, and `myc_started_at`
+must remain `NULL` until the user confirms "I COMMIT". **Decision:** enforce this invariant in the
+database with trigger `tr_protect_profile_fields`. Direct updates to `myc_started_at`, `user_id`, or
+`created_at` from client RLS are rejected. Only the trusted internal confirmation RPC setting session
+config `myc.internal_confirmation = 'true'` may set `myc_started_at`. Once set, `myc_started_at` is
+permanently immutable. Profiles are created automatically on user signup via `auth.users` trigger and
+retrieved idempotently via `ensure_profile(detected_timezone text)`. **Consequences:** client-side bugs
+or direct API calls cannot prematurely start or rewrite a user's journey.
+
+### D-23 · Atomic "I COMMIT" Confirmation Transaction via RPC — 2026-10-17
+
+Task 06 requires the first commitment review and "I COMMIT" confirmation to atomically activate the
+commitment and record the official start date. **Decision:** implement `confirm_first_commitment(commitment_id uuid, client_local_date date)`
+as a `SECURITY DEFINER` PostgreSQL function. In a single transaction with row-level locking (`FOR UPDATE`),
+it validates the commitment belongs to the calling user, sets `profiles.myc_started_at` to the user's
+local calendar date (if not already set), sets commitment `status = 'active'`, and records `start_date`.
+Trigger `tr_check_commitment_rules` prevents any commitment from being marked active while `myc_started_at`
+is `NULL` unless performed inside this transaction. **Consequences:** zero race conditions, guaranteed
+atomicity, and no orphan active commitments without an official start date.
+
+### D-24 · Commitment Lifecycle, Frequencies, and Deletion Model — 2026-10-17
+
+Task 07 establishes commitment management. **Decision:**
+
+- Frequencies: supports `daily` and `specific_days` (array of integers `[1..7]` where 1 = Monday per ISO-8601).
+- Lifecycle: statuses are `draft`, `active`, `paused`, and `archived`.
+- Deletion (resolving Q-05): supports both soft-archival (`status = 'archived'`) for history preservation and
+  hard deletion with confirmation modal for unwanted commitments.
+- Colors: tokens `sky`, `emerald`, `amber`, `rose`, `indigo` mapped to design system accent classes.
+  **Consequences:** clean schedule validation in `@myc/utils/commitments` and database constraints.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.
@@ -185,9 +218,7 @@ Decide these before (or during) the task that needs them, then move each into th
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------- |
 | Q-01 | **Android package ID.** `com.myc.app` is a placeholder; it becomes permanent with the first Play Store release. Which domain will MYC use? | 1.13      |
 | Q-02 | **Production Supabase project.** Name, region (development is `ap-northeast-1`) and plan.                                                  | 1.15      |
-| Q-03 | **Definition of a consistent day.** All expected commitments completed, or a threshold (PRD §17 says it may be configurable)?              | 1.07      |
-| Q-04 | **Frequencies.** Only daily for the MVP, or specific weekdays / N-times-per-week? Affects "expected" actions and streaks.                  | 1.05      |
-| Q-05 | **Deleting a commitment.** Archive only, or hard delete? What happens to its history (PRD §42)?                                            | 1.05      |
+| Q-03 | **Definition of a consistent day.** All expected commitments completed, or a threshold (PRD §17 says it may be configurable)?              | 1.08      |
 | Q-06 | **Timezone changes.** Does a change apply from the next local day onward, and how are travel days counted (PRD §34, §42)?                  | 1.11      |
-| Q-07 | **Paused commitments.** Do paused days count as "not scheduled" for streaks?                                                               | 1.07      |
+| Q-07 | **Paused commitments.** Do paused days count as "not scheduled" for streaks?                                                               | 1.08      |
 | Q-08 | **Web hosting.** Vercel is assumed for production env vars; confirm.                                                                       | 1.15      |

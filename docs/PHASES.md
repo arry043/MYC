@@ -29,9 +29,9 @@ PHASE 1
 ├── 02. Supabase Foundation         ✅
 ├── 03. Design System & App Shell   ✅
 ├── 04. Authentication              ✅
-├── 05. User Profile & Onboarding
-├── 06. First Commitment + "I COMMIT"
-├── 07. Commitment Management
+├── 05. User Profile & Onboarding   ✅
+├── 06. First Commitment + "I COMMIT" ✅
+├── 07. Commitment Management       ✅
 ├── 08. Daily Completion System
 ├── 09. Streak Engine
 ├── 10. MYC Calendar — Year
@@ -160,9 +160,9 @@ Account & Security Management (Link Google, Set/Change Password)
 
 ---
 
-# 05 — User Profile & Onboarding
+# 05 — User Profile & Onboarding ✅
 
-Create:
+Created:
 
 ### `profiles`
 
@@ -175,12 +175,14 @@ created_at
 updated_at
 ```
 
-Implement:
+_Done:_
 
-- Profile creation
-- Timezone detection
-- Profile settings
-- Basic onboarding
+- `profiles` table with owner-only RLS and `tr_protect_profile_fields` trigger enforcing immutability of `myc_started_at`, `user_id`, and `created_at`.
+- Automatic profile creation on user signup via `handle_new_user` trigger on `auth.users`.
+- Idempotent profile initialization RPC `ensure_profile(detected_timezone text)`.
+- Client and server timezone detection with fallback to UTC.
+- Profile Settings section in `apps/web/src/app/(app)/settings/_components/profile-settings-section.tsx` supporting timezone selection and journey status display.
+- Complete 4-step onboarding flow at `apps/web/src/app/(app)/onboarding/page.tsx`: Welcome & Philosophy, Consistency Rules, Define First Commitment, and Review & "I COMMIT".
 
 Important:
 
@@ -190,11 +192,11 @@ account_created_at
 myc_started_at
 ```
 
-`myc_started_at` remains `NULL` until the first commitment is created and committed.
+`myc_started_at` remains `NULL` until the first commitment is created and committed via "I COMMIT".
 
 ---
 
-# 06 — First Commitment + "I COMMIT"
+# 06 — First Commitment + "I COMMIT" ✅
 
 This is a **critical MYC feature**.
 
@@ -207,48 +209,54 @@ Review
         ↓
 "I COMMIT"
         ↓
-myc_started_at = today
+myc_started_at = today (user local date)
         ↓
 MYC officially begins
 ```
 
-Implement:
+_Done:_
 
-- Commitment creation UI
-- Commitment preview
-- Confirmation screen
-- `I COMMIT` action
-- Atomic database operation
+- Commitment creation UI supporting title, description, frequency (daily or specific days), tone color, and start date.
+- Commitment preview screen displaying summary, frequency badges, and official start date.
+- Dedicated "I COMMIT" confirmation action.
+- Atomic PostgreSQL transaction via RPC `confirm_first_commitment(commitment_id uuid, client_local_date date)` setting `myc_started_at` and activating the commitment in one atomic operation with row locking (`FOR UPDATE`).
+- Database trigger `tr_check_commitment_rules` preventing commitments from activating while `myc_started_at` is `NULL` outside this transaction.
+- Celebration state transitioning user seamlessly to their active dashboard/commitments view.
 
 **Output:** User officially starts their MYC journey.
 
 ---
 
-# 07 — Commitment Management
+# 07 — Commitment Management ✅
 
-Now build the complete commitment system.
+The complete commitment system.
 
-Implement:
-
-- Create commitment
-- Edit commitment
-- Pause commitment
-- Resume commitment
-- Archive commitment
-- Delete commitment
-- Commitment details
-- Active/inactive states
-- Start/end dates
-- Frequency
-
-Example:
+### `commitments`
 
 ```text
-DSA Practice
-Every day
-Active
-Started: 07 Oct
+id
+user_id
+title
+description
+frequency (daily | specific_days)
+schedule_days (integer array [1..7])
+start_date (date)
+end_date (date, nullable)
+status (draft | active | paused | archived)
+tone (sky | emerald | amber | rose | indigo)
+created_at
+updated_at
 ```
+
+_Done:_
+
+- Commitments page (`apps/web/src/app/(app)/commitments/page.tsx`) with server-side streaming under `<Suspense>`.
+- Client view (`apps/web/src/app/(app)/commitments/_components/commitments-view.tsx`) with Active, Paused, and Archived filter tabs.
+- Full CRUD modals: `CommitmentDialog` for creating/editing and `DeleteCommitmentDialog` for permanent deletion.
+- Lifecycle controls: Pause, Resume, Archive, Edit, and Delete with responsive action menus.
+- Empty states tailored for first-time journey starters ("Define your first commitment") and empty status tabs.
+- Mobile display in `apps/mobile/src/App.tsx` showing active commitments and profile metadata.
+- Shared domain types in `@myc/types/domain` and validation utilities in `@myc/utils/commitments` with 100% test coverage.
 
 ---
 

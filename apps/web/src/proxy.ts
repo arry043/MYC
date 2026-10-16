@@ -6,7 +6,14 @@ import { sanitizeRedirectUrl } from "@myc/utils";
 
 import { getPublicEnv } from "@/lib/env";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/calendar", "/commitments", "/analytics", "/settings"];
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/calendar",
+  "/commitments",
+  "/analytics",
+  "/settings",
+  "/onboarding",
+];
 
 const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
 

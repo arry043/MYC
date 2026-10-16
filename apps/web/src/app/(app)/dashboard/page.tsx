@@ -16,7 +16,7 @@ import { MetricIndicator } from "@/components/progress/metric-indicator";
 import { ProgressRing } from "@/components/progress/progress-ring";
 import { Stagger, StaggerItem } from "@/components/shared/motion";
 import { StatCard } from "@/components/shared/stat-card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   sampleCommitments,
@@ -47,10 +47,10 @@ export default function DashboardPage() {
             >
               View calendar
             </Link>
-            <Button className="max-sm:flex-1">
+            <Link href="/commitments" className={buttonVariants({ className: "max-sm:flex-1" })}>
               <PlusIcon />
               New commitment
-            </Button>
+            </Link>
           </>
         }
       />
