@@ -61,7 +61,7 @@ async function CalendarDataLoader({ searchParams }: CalendarPageProps) {
   await connection();
   const params = await searchParams;
 
-  const view = (params.view as ViewType) || "year";
+  const view = (params.view as ViewType) || "day";
   const date = params.date;
   const filter = params.filter || "all";
   const year = params.year ? Number(params.year) : undefined;
@@ -76,12 +76,7 @@ async function CalendarDataLoader({ searchParams }: CalendarPageProps) {
     month,
   });
 
-  return (
-    <CalendarView
-      key={`${data.view}-${data.selectedDate}-${data.filterCommitmentId}`}
-      initialData={data}
-    />
-  );
+  return <CalendarView initialData={data} />;
 }
 
 export default function CalendarPage(props: CalendarPageProps) {

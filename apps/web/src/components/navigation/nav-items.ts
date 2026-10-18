@@ -4,6 +4,7 @@ import {
   LayoutGridIcon,
   ListChecksIcon,
   SettingsIcon,
+  UserRoundIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ export const primaryNav: readonly NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: ChartColumnIcon },
 ];
 
+export const profileNav: NavItem = { href: "/profile", label: "Profile", icon: UserRoundIcon };
 export const settingsNav: NavItem = { href: "/settings", label: "Settings", icon: SettingsIcon };
 
 export function isActive(pathname: string, href: string) {

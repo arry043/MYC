@@ -26,7 +26,11 @@ function SegmentedControl<T extends string>({
   className,
   ...props
 }: SegmentedControlProps<T>) {
-  const thumbId = useId();
+  const generatedId = useId();
+  const thumbId = props["aria-label"]
+    ? `segmented-${props["aria-label"].toLowerCase().replace(/[^a-z0-9]/g, "-")}`
+    : generatedId;
+
   return (
     <RadioGroup
       value={value}
@@ -35,7 +39,10 @@ function SegmentedControl<T extends string>({
         if (match) onValueChange(match.value);
       }}
       aria-label={props["aria-label"]}
-      className={cn("inline-flex rounded-full bg-secondary p-1", className)}
+      className={cn(
+        "inline-flex items-center rounded-full border border-border/50 bg-secondary p-1",
+        className,
+      )}
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -43,17 +50,19 @@ function SegmentedControl<T extends string>({
           <Radio.Root
             key={option.value}
             value={option.value}
-            className="relative h-8 cursor-pointer rounded-full px-3.5 type-small font-semibold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-4 focus-visible:ring-ring/30 data-checked:text-foreground"
+            className="relative inline-flex h-8 min-w-[4rem] flex-1 cursor-pointer items-center justify-center rounded-full px-3 text-center type-small font-semibold text-muted-foreground transition-colors duration-150 outline-none select-none hover:text-foreground focus-visible:ring-4 focus-visible:ring-ring/30 sm:min-w-[4.5rem] data-checked:text-foreground"
           >
             {selected && (
               <motion.span
                 layoutId={thumbId}
                 transition={transition.layout}
                 aria-hidden
-                className="absolute inset-0 rounded-full bg-card shadow-raised"
+                className="pointer-events-none absolute inset-0 z-0 rounded-full bg-card shadow-raised"
               />
             )}
-            <span className="relative">{option.label}</span>
+            <span className="pointer-events-none relative z-10 block truncate select-none">
+              {option.label}
+            </span>
           </Radio.Root>
         );
       })}

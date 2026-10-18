@@ -21,6 +21,13 @@ export async function registerServiceWorker(
     return null;
   }
 
+  // Dev chunk URLs are not content-hashed, so the worker's Cache-First strategy would serve
+  // stale JS after every edit (hydration mismatches). Remove any worker left from earlier runs.
+  if (process.env.NODE_ENV !== "production") {
+    await unregisterServiceWorkers();
+    return null;
+  }
+
   // Only register on secure contexts (HTTPS or localhost)
   const isLocalhost =
     window.location.hostname === "localhost" ||
@@ -75,6 +82,25 @@ export async function registerServiceWorker(
       console.warn("[MYC SW] Service Worker registration failed:", error);
     }
     return null;
+  }
+}
+
+/**
+ * Unregisters every service worker for this origin and deletes MYC caches.
+ */
+async function unregisterServiceWorkers(): Promise<void> {
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((key) => key.startsWith("myc-")).map((key) => caches.delete(key)),
+      );
+    }
+  } catch (error) {
+    console.warn("[MYC SW] Service Worker cleanup failed:", error);
   }
 }
 
