@@ -1188,7 +1188,7 @@ export async function getCalendarData(
       selectedDate: options.date || todayFallback,
       selectedYear: options.year || currentYear,
       selectedMonth: options.month || currentMonth,
-      view: options.view || "year",
+      view: options.view || "day",
       filterCommitmentId: options.filterCommitmentId || "all",
       days: [],
       periodSummary: {
@@ -1218,7 +1218,7 @@ export async function getCalendarData(
   const userTodayYear = todayParts[0] ?? currentYear;
   const userTodayMonth = todayParts[1] ?? currentMonth;
 
-  const view = options.view || "year";
+  const view = options.view || "day";
   const filterCommitmentId = options.filterCommitmentId || "all";
   const selectedDate = options.date || todayDate;
   const selectedYear =

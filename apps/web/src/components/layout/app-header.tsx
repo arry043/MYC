@@ -1,24 +1,23 @@
 "use client";
 
-import { SettingsIcon } from "lucide-react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { isActive, primaryNav, settingsNav } from "@/components/navigation/nav-items";
+import { isActive, primaryNav, profileNav, settingsNav } from "@/components/navigation/nav-items";
 import { UserMenu } from "@/components/navigation/user-menu";
 import { Brand } from "@/components/shared/brand";
-import { buttonVariants } from "@/components/ui/button";
 
 /**
- * Top bar. Phones: brand, settings and account. Tablet and up the brand sits in the sidebar,
- * so the bar shows where you are instead.
+ * Top bar. Shows brand on phones and current section path on tablet/desktop,
+ * with the UserMenu profile dropdown on the right.
  */
 function AppHeader() {
   const pathname = usePathname();
-  const current = [...primaryNav, settingsNav].find((item) => isActive(pathname, item.href));
+  const current = [...primaryNav, profileNav, settingsNav].find((item) =>
+    isActive(pathname, item.href),
+  );
 
   return (
-    <header className="sticky top-0 z-30 flex h-(--header-height) items-center gap-3 border-b border-border/60 bg-background/80 px-page backdrop-blur-xl md:border-transparent">
+    <header className="sticky top-0 z-30 flex h-(--header-height) items-center gap-3 rounded-b-[1.75rem] border-x border-b border-border/80 bg-card/95 px-page shadow-raised backdrop-blur-xl md:rounded-none md:border-x-0 md:border-b md:border-transparent md:bg-background/80 md:shadow-none">
       <Brand className="md:hidden" />
       {current && (
         <p className="hidden type-small text-muted-foreground md:block">
@@ -27,18 +26,6 @@ function AppHeader() {
         </p>
       )}
       <div className="ml-auto flex items-center gap-2">
-        <Link
-          href={settingsNav.href}
-          aria-label="Settings"
-          aria-current={isActive(pathname, settingsNav.href) ? "page" : undefined}
-          className={buttonVariants({
-            variant: "ghost",
-            size: "icon",
-            className: "rounded-full aria-[current=page]:text-primary md:hidden",
-          })}
-        >
-          <SettingsIcon aria-hidden className="size-5" />
-        </Link>
         <UserMenu />
       </div>
     </header>

@@ -17,7 +17,7 @@ function BottomNav() {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border/70 bg-background/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 rounded-t-[1.75rem] border-x border-t border-border/80 bg-card/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_24px_oklch(0.28_0.025_255/0.08)] backdrop-blur-xl md:hidden"
     >
       <ul className="mx-auto grid h-(--bottom-nav-height) max-w-md grid-cols-4 px-2">
         {primaryNav.map((item) => {
@@ -29,7 +29,7 @@ function BottomNav() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl type-caption font-semibold transition-[color,scale] duration-200 outline-none focus-visible:ring-4 focus-visible:ring-ring/30 active:scale-95",
+                  "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-2xl type-caption font-semibold transition-[color,scale] duration-200 outline-none focus-visible:ring-4 focus-visible:ring-ring/30 active:scale-95",
                   active ? "text-primary-soft-foreground" : "text-muted-foreground",
                 )}
               >

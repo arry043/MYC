@@ -16,7 +16,6 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
 import { AccountSecuritySection } from "./_components/account-security-section";
-import { ProfileSettingsSection } from "./_components/profile-settings-section";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -77,12 +76,10 @@ export default function SettingsPage() {
       <PageHeader
         eyebrow="Settings"
         title="Make MYC work for you"
-        description="Your profile, reminders and account security."
+        description="Your reminders, app preferences, and account security."
       />
 
       <div className="grid gap-stack">
-        <ProfileSettingsSection />
-
         <SettingsSection
           title="Reminders"
           description="Gentle nudges, never spam. Turn off anything you don't need."

@@ -86,6 +86,18 @@ export function CalendarView({ initialData }: CalendarViewProps) {
     };
   }, [router]);
 
+  // Synchronize state when initialData updates from server without remounting
+  const [prevInitialData, setPrevInitialData] = useState(initialData);
+  if (initialData !== prevInitialData) {
+    setPrevInitialData(initialData);
+    setView(initialData.view);
+    setSelectedDate(initialData.selectedDate);
+    setSelectedYear(initialData.selectedYear);
+    setSelectedMonth(initialData.selectedMonth);
+    setFilterCommitmentId(initialData.filterCommitmentId);
+    setDays(initialData.days);
+  }
+
   // Navigate URL on view/filter/date change so data reloads smoothly
   const navigateTo = (newView: CalendarView, newDate: string, newFilter: string | "all") => {
     startTransition(() => {
@@ -328,10 +340,11 @@ export function CalendarView({ initialData }: CalendarViewProps) {
             value={view}
             onValueChange={handleViewChange}
             aria-label="Calendar view mode"
+            className="w-full sm:w-auto"
           />
 
           {/* Commitment Filter */}
-          <div className="relative inline-block">
+          <div className="relative inline-block w-full sm:w-auto">
             <label htmlFor="commitment-filter" className="sr-only">
               Filter by commitment
             </label>
@@ -339,7 +352,7 @@ export function CalendarView({ initialData }: CalendarViewProps) {
               id="commitment-filter"
               value={filterCommitmentId}
               onChange={(e) => handleFilterChange(e.target.value)}
-              className="h-10 rounded-xl border border-input bg-card px-3.5 py-1.5 type-small font-medium text-foreground shadow-xs outline-none focus-visible:ring-4 focus-visible:ring-ring/30"
+              className="h-10 w-full rounded-xl border border-input bg-card px-3.5 py-1.5 type-small font-medium text-foreground shadow-xs outline-none focus-visible:ring-4 focus-visible:ring-ring/30 sm:w-auto"
             >
               <option value="all">All commitments</option>
               {commitments.map((c) => (
@@ -352,7 +365,7 @@ export function CalendarView({ initialData }: CalendarViewProps) {
         </div>
 
         {/* Date Navigation & Today */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 max-sm:justify-between">
           <Button
             variant="secondary"
             size="icon-sm"

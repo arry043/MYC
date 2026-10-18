@@ -62,6 +62,10 @@ function UserMenu() {
           <DropdownMenuLabel className="max-w-[14rem] truncate font-medium">
             {email ?? "Account"}
           </DropdownMenuLabel>
+          <DropdownMenuItem render={<Link href="/profile" />}>
+            <UserRoundIcon />
+            Profile
+          </DropdownMenuItem>
           <DropdownMenuItem render={<Link href="/settings" />}>
             <SettingsIcon />
             Settings
@@ -73,7 +77,7 @@ function UserMenu() {
           className="text-destructive focus:text-destructive"
         >
           <LogOutIcon />
-          Sign out
+          Logout
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

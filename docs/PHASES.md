@@ -182,7 +182,7 @@ _Done:_
 - Automatic profile creation on user signup via `handle_new_user` trigger on `auth.users`.
 - Idempotent profile initialization RPC `ensure_profile(detected_timezone text)`.
 - Client and server timezone detection with fallback to UTC.
-- Profile Settings section in `apps/web/src/app/(app)/settings/_components/profile-settings-section.tsx` supporting timezone selection and journey status display.
+- Profile section at `apps/web/src/app/(app)/profile/page.tsx` (`ProfileDetailsSection`) supporting timezone selection and journey status display.
 - Complete 4-step onboarding flow at `apps/web/src/app/(app)/onboarding/page.tsx`: Welcome & Philosophy, Consistency Rules, Define First Commitment, and Review & "I COMMIT".
 
 Important:

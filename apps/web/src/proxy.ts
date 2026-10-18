@@ -11,6 +11,7 @@ const PROTECTED_PREFIXES = [
   "/calendar",
   "/commitments",
   "/analytics",
+  "/profile",
   "/settings",
   "/onboarding",
 ];

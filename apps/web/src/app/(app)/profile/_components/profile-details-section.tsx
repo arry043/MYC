@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { isValidTimezone } from "@myc/utils";
@@ -33,7 +34,7 @@ const COMMON_TIMEZONES = [
   { value: "UTC", label: "Coordinated Universal Time (UTC)" },
 ];
 
-export function ProfileSettingsSection() {
+export function ProfileDetailsSection() {
   const [email, setEmail] = useState<string>("");
   const [timezone, setTimezone] = useState<string>("UTC");
   const [initialTimezone, setInitialTimezone] = useState<string>("UTC");
@@ -147,18 +148,27 @@ export function ProfileSettingsSection() {
   return (
     <Card className="gap-6 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10">
       <div className="grid content-start gap-1">
-        <h2 className="type-h3">Profile</h2>
+        <h2 className="type-h3">Profile Details</h2>
         <p className="type-small text-muted-foreground">
-          Your account identity and the day boundary MYC uses.
+          Your account identity and the day boundary MYC uses for daily consistency.
         </p>
       </div>
 
       <div className="grid gap-5">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field>
-            <Label htmlFor="profile-email">Email</Label>
+            <Label htmlFor="profile-email">Email Address</Label>
             <Input id="profile-email" type="email" value={email} disabled />
-            <FieldHint>Managed in Account & Security below.</FieldHint>
+            <FieldHint>
+              Need to change your password or providers? Visit{" "}
+              <Link
+                href="/settings"
+                className="font-semibold text-foreground underline underline-offset-4 hover:text-primary"
+              >
+                Settings
+              </Link>
+              .
+            </FieldHint>
           </Field>
 
           <Field>
