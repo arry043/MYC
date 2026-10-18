@@ -1,11 +1,16 @@
 export {
   type AuthIdentitySummary,
   type MinimalUser,
+  type AuthRouteResolutionOptions,
+  type AuthRouteDecision,
+  PROTECTED_ROUTES,
+  AUTH_ROUTES,
   canUnlinkProvider,
   extractAuthIdentities,
   formatAuthError,
   isValidEmail,
   parseAuthCallbackParams,
+  resolveAuthRouteDecision,
   sanitizeRedirectUrl,
   validatePassword,
 } from "./auth";

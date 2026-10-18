@@ -249,3 +249,105 @@ export function parseAuthCallbackParams(rawUrl: string): {
     return {};
   }
 }
+
+/**
+ * Route prefixes requiring authentication.
+ */
+export const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/calendar",
+  "/commitments",
+  "/analytics",
+  "/profile",
+  "/settings",
+  "/onboarding",
+] as const;
+
+/**
+ * Public authentication routes.
+ */
+export const AUTH_ROUTES = ["/login", "/signup", "/forgot-password"] as const;
+
+export interface AuthRouteResolutionOptions {
+  pathname: string;
+  hasUser: boolean;
+  isEmailVerified?: boolean;
+  nextParam?: string | null;
+  searchParams?: Record<string, string> | URLSearchParams;
+}
+
+export type AuthRouteDecision = { action: "allow" } | { action: "redirect"; destination: string };
+
+/**
+ * Platform-agnostic route resolution for authentication and access control.
+ * Ensures consistent routing decisions across proxy/middleware and server-rendered components.
+ */
+export function resolveAuthRouteDecision({
+  pathname,
+  hasUser,
+  isEmailVerified = false,
+  nextParam = null,
+  searchParams,
+}: AuthRouteResolutionOptions): AuthRouteDecision {
+  const cleanPath = pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
+
+  const isProtected = PROTECTED_ROUTES.some(
+    (prefix) => cleanPath === prefix || cleanPath.startsWith(`${prefix}/`),
+  );
+  const isAuthPage = (AUTH_ROUTES as readonly string[]).includes(cleanPath);
+  const isVerifyEmailPage = cleanPath === "/verify-email";
+  const isHomePage = cleanPath === "/";
+
+  // 1. Unauthenticated users
+  if (!hasUser) {
+    if (isProtected) {
+      const safeNext = sanitizeRedirectUrl(cleanPath);
+      const destination =
+        safeNext !== "/dashboard" ? `/login?next=${encodeURIComponent(safeNext)}` : "/login";
+      return { action: "redirect", destination };
+    }
+    if (isVerifyEmailPage) {
+      return { action: "redirect", destination: "/login" };
+    }
+    return { action: "allow" };
+  }
+
+  // 2. Authenticated user with UNVERIFIED email
+  if (!isEmailVerified) {
+    if (isProtected || isAuthPage || isHomePage) {
+      return { action: "redirect", destination: "/verify-email" };
+    }
+    return { action: "allow" };
+  }
+
+  // 3. Authenticated user with VERIFIED email
+  if (isVerifyEmailPage) {
+    return { action: "redirect", destination: "/dashboard" };
+  }
+
+  if (isAuthPage) {
+    const rawNext =
+      nextParam ??
+      (searchParams instanceof URLSearchParams ? searchParams.get("next") : searchParams?.["next"]);
+    const destination = sanitizeRedirectUrl(rawNext, "/dashboard");
+    return { action: "redirect", destination };
+  }
+
+  if (isHomePage) {
+    let destination = "/dashboard";
+    if (searchParams) {
+      const params =
+        searchParams instanceof URLSearchParams
+          ? new URLSearchParams(searchParams)
+          : new URLSearchParams(searchParams);
+      // Remove any redundant parameters if needed, but preserve source=pwa etc.
+      const queryString = params.toString();
+      if (queryString) {
+        destination = `/dashboard?${queryString}`;
+      }
+    }
+    return { action: "redirect", destination };
+  }
+
+  return { action: "allow" };
+}

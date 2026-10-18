@@ -1,12 +1,22 @@
 import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import { Suspense } from "react";
+
+import { resolveAuthRouteDecision } from "@myc/utils";
 
 import { BrandMark } from "@/components/shared/brand";
 import { FadeIn } from "@/components/shared/motion";
 import { buttonVariants } from "@/components/ui/button";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
+import { createClient } from "@/lib/supabase/server";
 
-export default function HomePage() {
+interface HomePageProps {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+function HomeLandingView() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center px-page py-24">
       <FadeIn className="flex max-w-md flex-col items-center gap-6 text-center">
@@ -29,5 +39,44 @@ export default function HomePage() {
         </div>
       </FadeIn>
     </main>
+  );
+}
+
+async function HomeAuthCheck(props: HomePageProps) {
+  await connection();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    const rawSearchParams = props.searchParams ? await props.searchParams : {};
+    const searchParamsRecord: Record<string, string> = {};
+    for (const [key, val] of Object.entries(rawSearchParams)) {
+      if (typeof val === "string") {
+        searchParamsRecord[key] = val;
+      }
+    }
+
+    const decision = resolveAuthRouteDecision({
+      pathname: "/",
+      hasUser: true,
+      isEmailVerified: Boolean(user.email_confirmed_at),
+      searchParams: searchParamsRecord,
+    });
+
+    if (decision.action === "redirect") {
+      redirect(decision.destination);
+    }
+  }
+
+  return <HomeLandingView />;
+}
+
+export default function HomePage(props: HomePageProps) {
+  return (
+    <Suspense fallback={<HomeLandingView />}>
+      <HomeAuthCheck {...props} />
+    </Suspense>
   );
 }
