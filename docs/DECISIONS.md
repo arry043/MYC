@@ -278,6 +278,32 @@ TASK Fix establishes permanent completion immutability, activity notes, and fixe
 - **Realtime Multi-Device Sync:**
   - Supabase Realtime channel subscription on `public.daily_completions` in `CalendarView`, `DashboardView`, and `CommitmentsView` calling `router.refresh()` to propagate changes across devices and tabs without duplicate listeners or manual browser refreshes.
 
+### D-30 · Production-Ready Progressive Web App (PWA) Implementation — 2026-10-18
+
+Phase 13 establishes the installable Progressive Web App architecture:
+
+- **Vanilla Service Worker over Webpack Plugins:** Next.js 16 uses Turbopack by default. Third-party Next.js PWA plugins (`next-pwa`, `@ducanh2912/next-pwa`) monkey-patch webpack compiler hooks and break Turbopack builds. A pure vanilla Service Worker in `apps/web/public/sw.js` with TypeScript utilities in `packages/utils/src/pwa.ts` and React registration hooks provides zero build friction, fast startup, and complete control over caching scopes.
+- **Strict Network-Only Isolation for Authenticated / Sensitive Data:**
+  - Cache Storage NEVER caches Supabase API responses (`*.supabase.co`, `/rest/v1/*`, `/auth/v1/*`), mutation requests (`POST`, `PUT`, `PATCH`, `DELETE`), authenticated profile data, user commitment records, or completions.
+  - Caching sensitive user data in Cache Storage risks exposing private records or stale streak calculations across user logout or device sharing.
+- **Offline Integrity Protection:**
+  - When navigation requests fail offline, the Service Worker serves a dedicated pre-cached `/offline` shell.
+  - The offline shell does not offer simulated completion buttons, fake offline queues, or fabricated streaks. It transparently explains that consistency records require a live connection to preserve permanent immutability, with an interactive "Try again" reload button.
+- **Controlled App Update Lifecycle:**
+  - Service worker checks for byte updates on navigation. When a new worker is discovered, the client UI displays an unobtrusive `UpdateNotice` toast ("A new version of MYC is available") rather than forcing an unannounced page reload that could discard active user inputs.
+  - Clicking "Update now" sends a `SKIP_WAITING` message to the waiting worker. A duplicate reload guard (`hasReloadedForUpdate`) prevents reload loops when `controllerchange` fires.
+- **Concurrent-Safe Installation & Display Mode Detection:**
+  - Installed/standalone detection uses `useSyncExternalStore` bound to `(display-mode: standalone)` and `window.navigator.standalone`. This avoids synchronous `setState` in effects, eliminating cascading renders and hydration mismatches.
+  - The Settings page provides clear status feedback across all platforms: native "Install App" prompt on Chromium/Android, step-by-step instructions for iOS Safari ("Add to Home Screen"), and "App Installed" status when running in standalone mode.
+- **Smart, Non-Intrusive Install App Popup (`InstallAppPopup`):**
+  - **Non-blocking presentation:** Positioned as a floating popover/card (`sm:bottom-6 sm:right-6 max-w-sm` on desktop, `bottom-20 left-4 right-4` on mobile safely above the bottom navigation). Designed with locked MYC tokens, soft cyan-blue accents, and `BrandMark`.
+  - **Smart Delay (10s):** Waits 10 seconds (`INSTALL_DELAY_MS`) after initial mount before evaluating eligibility, ensuring initial authentication and page loading are complete.
+  - **App-Level Single Controller:** Controlled in root `PwaProvider` across the entire session; route transitions (`usePathname()`) do not restart the timer or cause duplicate popups.
+  - **Route Suppression:** Automatically suppressed on critical paths (`/onboarding`, `/offline`, `/verify-email`, `/reset-password`) to prevent interrupting first-commitment creation or sensitive auth flows.
+  - **Dismissal & 7-Day Cooldown:** Dismissing via "Maybe Later" or the close button sets an in-memory session dismissal flag and a 7-day cooldown (`INSTALL_COOLDOWN_DAYS = 7`) in `localStorage` (`myc_pwa_install_dismissed_until`). Storage access is protected with `try/catch` to fail gracefully in private browsing or disabled storage.
+  - **Platform-Aware Actions:** Triggers native install on Chromium/Android, provides inline Safari "Share → Add to Home Screen" instructions on iOS, and suppresses automatic popups on unsupported desktop browsers to avoid nonfunctional buttons.
+  - **Permanent Suppression upon Installation:** When running in standalone mode or once installation succeeds, the popup is permanently suppressed.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.

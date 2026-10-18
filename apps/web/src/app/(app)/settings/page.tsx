@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { PageHeader } from "@/components/layout/page-header";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { Card } from "@/components/ui/card";
 import { Field, Label } from "@/components/ui/label";
 import {
@@ -114,6 +115,14 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </Field>
+        </SettingsSection>
+
+        {/* App & Installation Section */}
+        <SettingsSection
+          title="App & Installation"
+          description="Install MYC to your desktop or mobile home screen for a fast, standalone app experience."
+        >
+          <InstallPrompt />
         </SettingsSection>
 
         {/* Real Account & Security Section wrapped in Suspense for useSearchParams */}

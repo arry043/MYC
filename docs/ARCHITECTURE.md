@@ -88,8 +88,8 @@ Packages never import from apps, and `packages/utils` never imports platform API
 | Supabase (browser)  | `src/lib/supabase/client.ts` — `createBrowserClient`, singleton in the browser                                                                                                                                                                                                                                               |
 | Supabase (server)   | `src/lib/supabase/server.ts` — `createServerClient` with cookies, one per request, `server-only`                                                                                                                                                                                                                             |
 | Env                 | `src/lib/env.ts` — validated lazily when a client is created                                                                                                                                                                                                                                                                 |
-| PWA                 | `src/app/manifest.ts`, `src/app/icon.svg`, `src/app/apple-icon.png`, `public/icons/*`                                                                                                                                                                                                                                        |
-| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`                                                                                                                                                                                                                                            |
+| PWA                 | Vanilla Service Worker `public/sw.js` (modular, zero webpack dependency), dynamic manifest `src/app/manifest.ts`, offline shell `src/app/offline/`, lifecycle & install hooks `src/components/pwa/` & `src/lib/pwa/`, standard & maskable icons in `public/icons/*` (D-30)                                                   |
+| Security headers    | `next.config.ts` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Cache-Control` on `/sw.js`                                                                                                                                                                                                               |
 | Dev diagnostics     | `src/app/api/dev/supabase/route.ts` — connectivity check, 404 in production                                                                                                                                                                                                                                                  |
 | Component gallery   | `src/app/(app)/dev/ui/` — every component and state, 404 in production                                                                                                                                                                                                                                                       |
 
@@ -97,7 +97,7 @@ Layout breakpoints: phone (< 768px) has a compact header, single column and a bo
 the four main sections (Settings in the header); tablet (768–1023px) has a labelled icon rail;
 desktop (≥ 1024px) has a full sidebar. Spacing tokens shrink on smaller screens.
 
-_Planned:_ a service worker for the basic offline shell.
+Service worker caching follows a strict security-first architecture: static assets (JS/CSS/fonts/icons) are Cache-First, HTML navigations are Network-First falling back to `/offline`, and Supabase API / auth mutations / user records are strictly Network-Only and never stored in Cache Storage.
 
 ## 5. Mobile — `apps/mobile`
 
