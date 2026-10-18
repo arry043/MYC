@@ -2,21 +2,9 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 import type { Database } from "@myc/types";
-import { sanitizeRedirectUrl } from "@myc/utils";
+import { resolveAuthRouteDecision } from "@myc/utils";
 
 import { getPublicEnv } from "@/lib/env";
-
-const PROTECTED_PREFIXES = [
-  "/dashboard",
-  "/calendar",
-  "/commitments",
-  "/analytics",
-  "/profile",
-  "/settings",
-  "/onboarding",
-];
-
-const AUTH_PAGES = ["/login", "/signup", "/forgot-password"];
 
 /**
  * Next.js 16 Proxy convention (renamed from middleware).
@@ -48,6 +36,16 @@ export async function proxy(request: NextRequest) {
     },
   });
 
+  // Helper to ensure refreshed session cookies are preserved across redirects
+  function redirectWithCookies(target: string | URL): NextResponse {
+    const redirectUrl = new URL(target, request.url);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    for (const cookie of response.cookies.getAll()) {
+      redirectResponse.cookies.set(cookie);
+    }
+    return redirectResponse;
+  }
+
   // getUser() validates the token against the Supabase Auth server.
   // Never use getSession() inside middleware/proxy as it is not cryptographically verified.
   const {
@@ -55,50 +53,16 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const decision = resolveAuthRouteDecision({
+    pathname,
+    hasUser: Boolean(user),
+    isEmailVerified: Boolean(user?.email_confirmed_at),
+    nextParam: request.nextUrl.searchParams.get("next"),
+    searchParams: request.nextUrl.searchParams,
+  });
 
-  const isProtected = PROTECTED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-  const isAuthPage = AUTH_PAGES.includes(pathname);
-  const isVerifyEmailPage = pathname === "/verify-email";
-
-  // 1. Unauthenticated users trying to access protected pages
-  if (isProtected && !user) {
-    const loginUrl = new URL("/login", request.url);
-    const safeNext = sanitizeRedirectUrl(pathname);
-    if (safeNext !== "/dashboard") {
-      loginUrl.searchParams.set("next", safeNext);
-    }
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // 2. Unauthenticated user on verify-email page
-  if (isVerifyEmailPage && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // 3. Authenticated user checks
-  if (user) {
-    const isEmailVerified = Boolean(user.email_confirmed_at);
-
-    // If email is not verified, block access to protected features and direct to verify-email
-    if (!isEmailVerified) {
-      if (isProtected || isAuthPage) {
-        return NextResponse.redirect(new URL("/verify-email", request.url));
-      }
-    } else {
-      // If email is already verified:
-      // - Redirect away from /verify-email to /dashboard
-      if (isVerifyEmailPage) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      }
-      // - Redirect away from auth pages (login, signup, forgot-password) to /dashboard
-      if (isAuthPage) {
-        const nextParam = request.nextUrl.searchParams.get("next");
-        const destination = sanitizeRedirectUrl(nextParam, "/dashboard");
-        return NextResponse.redirect(new URL(destination, request.url));
-      }
-    }
+  if (decision.action === "redirect") {
+    return redirectWithCookies(decision.destination);
   }
 
   return response;

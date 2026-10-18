@@ -7,6 +7,7 @@ import {
   formatAuthError,
   isValidEmail,
   parseAuthCallbackParams,
+  resolveAuthRouteDecision,
   sanitizeRedirectUrl,
   validatePassword,
 } from "./auth.ts";
@@ -132,4 +133,180 @@ test("parseAuthCallbackParams parses code and hash fragments", () => {
   const parsedError = parseAuthCallbackParams(errorUrl);
   assert.strictEqual(parsedError.error, "access_denied");
   assert.strictEqual(parsedError.errorDescription, "User cancelled");
+});
+
+test("resolveAuthRouteDecision: unauthenticated visitors", () => {
+  // Public landing page is allowed
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/", hasUser: false }), {
+    action: "allow",
+  });
+
+  // Auth pages are allowed
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/login", hasUser: false }), {
+    action: "allow",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/signup", hasUser: false }), {
+    action: "allow",
+  });
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/forgot-password", hasUser: false }),
+    { action: "allow" },
+  );
+
+  // Protected pages redirect to /login with next parameter
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/dashboard", hasUser: false }), {
+    action: "redirect",
+    destination: "/login",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/calendar", hasUser: false }), {
+    action: "redirect",
+    destination: "/login?next=%2Fcalendar",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/commitments", hasUser: false }), {
+    action: "redirect",
+    destination: "/login?next=%2Fcommitments",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/analytics", hasUser: false }), {
+    action: "redirect",
+    destination: "/login?next=%2Fanalytics",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/profile", hasUser: false }), {
+    action: "redirect",
+    destination: "/login?next=%2Fprofile",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/settings", hasUser: false }), {
+    action: "redirect",
+    destination: "/login?next=%2Fsettings",
+  });
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/onboarding", hasUser: false }), {
+    action: "redirect",
+    destination: "/login?next=%2Fonboarding",
+  });
+
+  // Verify email page redirects unauthenticated users to /login
+  assert.deepStrictEqual(resolveAuthRouteDecision({ pathname: "/verify-email", hasUser: false }), {
+    action: "redirect",
+    destination: "/login",
+  });
+});
+
+test("resolveAuthRouteDecision: authenticated unverified users", () => {
+  // Landing page redirects to /verify-email
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/", hasUser: true, isEmailVerified: false }),
+    { action: "redirect", destination: "/verify-email" },
+  );
+
+  // Auth pages redirect to /verify-email
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/login", hasUser: true, isEmailVerified: false }),
+    { action: "redirect", destination: "/verify-email" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/signup", hasUser: true, isEmailVerified: false }),
+    { action: "redirect", destination: "/verify-email" },
+  );
+
+  // Protected pages redirect to /verify-email
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/dashboard", hasUser: true, isEmailVerified: false }),
+    { action: "redirect", destination: "/verify-email" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/commitments", hasUser: true, isEmailVerified: false }),
+    { action: "redirect", destination: "/verify-email" },
+  );
+
+  // Verify-email page itself is allowed so user can see it
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/verify-email", hasUser: true, isEmailVerified: false }),
+    { action: "allow" },
+  );
+});
+
+test("resolveAuthRouteDecision: authenticated verified users", () => {
+  // Landing page redirects to /dashboard immediately
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/", hasUser: true, isEmailVerified: true }),
+    { action: "redirect", destination: "/dashboard" },
+  );
+
+  // Landing page preserves query params (e.g. PWA standalone source=pwa)
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({
+      pathname: "/",
+      hasUser: true,
+      isEmailVerified: true,
+      searchParams: { source: "pwa" },
+    }),
+    { action: "redirect", destination: "/dashboard?source=pwa" },
+  );
+
+  // Auth pages redirect to /dashboard (or nextParam if provided)
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/login", hasUser: true, isEmailVerified: true }),
+    { action: "redirect", destination: "/dashboard" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({
+      pathname: "/login",
+      hasUser: true,
+      isEmailVerified: true,
+      nextParam: "/commitments",
+    }),
+    { action: "redirect", destination: "/commitments" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({
+      pathname: "/login",
+      hasUser: true,
+      isEmailVerified: true,
+      nextParam: "https://evil.com", // malicious redirect is sanitized
+    }),
+    { action: "redirect", destination: "/dashboard" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/signup", hasUser: true, isEmailVerified: true }),
+    { action: "redirect", destination: "/dashboard" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({
+      pathname: "/forgot-password",
+      hasUser: true,
+      isEmailVerified: true,
+    }),
+    { action: "redirect", destination: "/dashboard" },
+  );
+
+  // Verify-email redirects to /dashboard if already verified
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/verify-email", hasUser: true, isEmailVerified: true }),
+    { action: "redirect", destination: "/dashboard" },
+  );
+
+  // Protected pages are allowed
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/dashboard", hasUser: true, isEmailVerified: true }),
+    { action: "allow" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/calendar", hasUser: true, isEmailVerified: true }),
+    { action: "allow" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/commitments", hasUser: true, isEmailVerified: true }),
+    { action: "allow" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/analytics", hasUser: true, isEmailVerified: true }),
+    { action: "allow" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/profile", hasUser: true, isEmailVerified: true }),
+    { action: "allow" },
+  );
+  assert.deepStrictEqual(
+    resolveAuthRouteDecision({ pathname: "/settings", hasUser: true, isEmailVerified: true }),
+    { action: "allow" },
+  );
 });
