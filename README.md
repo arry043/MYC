@@ -211,6 +211,17 @@ Every MYC screen uses the same tokens and components. Don't hard-code colours, s
 In development, **http://localhost:3000/dev/ui** shows every component and state (404 in
 production). Changing a token, e.g. `--primary`, restyles the whole app.
 
+## Progressive Web App (PWA)
+
+The Web app is an installable, production-ready Progressive Web App:
+
+- **Installation:** Installable on desktop and mobile browsers (Chrome, Edge, Brave, Android, and iOS Safari via "Add to Home Screen"). The Settings page (`/settings`) displays installation status and tailored installation prompts.
+- **Smart Install Popup:** Intelligent, non-intrusive floating popup that prompts eligible users after a 10-second delay. Respects a 7-day dismissal cooldown in `localStorage`, avoids sensitive routes (`/onboarding`, `/offline`), and is permanently suppressed once installed or in standalone mode.
+- **Vanilla Service Worker (`public/sw.js`):** Built with zero third-party webpack build dependencies for seamless compatibility with Next.js 16 and Turbopack.
+- **Secure Caching:** Static bundles and icons are Cache-First; HTML navigations are Network-First with a pre-cached `/offline` fallback. Supabase API requests, sessions, and mutations are strictly Network-Only and never saved to Cache Storage.
+- **Data Integrity:** The `/offline` shell clearly explains that consistency records require an active network connection, avoiding fake offline states or simulated streaks.
+- **Controlled Updates:** Discreet update notification toast prompts users to refresh when a new version is waiting, guarded against infinite reload loops.
+
 ## Running the mobile app
 
 ```bash

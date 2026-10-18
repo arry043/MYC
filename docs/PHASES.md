@@ -38,7 +38,7 @@ PHASE 1
 ├── 11. MYC Calendar — Month/Week/Day ✅
 ├── 12. Analytics Dashboard         ✅
 ├── Fix. Immutable Completions, Notes & Realtime ✅
-├── 13. PWA
+├── 13. PWA                     ✅
 ├── 14. Android App
 ├── 15. Android Widget
 ├── 16. Cross-Platform Sync
@@ -478,29 +478,66 @@ _Done:_
 
 ---
 
-# 13 — PWA
+# 13 — PWA ✅
 
-Now make the Web app installable.
+Transform the Next.js Web application into a production-ready, installable Progressive Web App (PWA).
 
-Implement:
+**Implemented:**
 
-- Manifest
-- Icons
-- Splash/loading behavior
-- Standalone mode
-- Service worker
-- Cache strategy
-- Offline app shell
-- Install prompt
-- Update handling
+- **Web App Manifest (`apps/web/src/app/manifest.ts`):**
+  - Generated dynamic manifest served at `/manifest.webmanifest`.
+  - Configured `id: "/"`, `name: "MYC — Make Yourself Consistent"`, `short_name: "MYC"`, `description`, `start_url: "/dashboard?source=pwa"`, `scope: "/"`, `display: "standalone"`, `orientation: "portrait-primary"`, `theme_color: "#18181b"`, `background_color: "#09090b"`.
+  - Icon suite: 192x192, 512x512 standard PNGs (`purpose: "any"`), 192x192 and 512x512 maskable PNGs (`purpose: "maskable"`), plus `apple-touch-icon.png` (180x180) in `public/icons/` and `/apple-icon.png`.
+  - Categories: `productivity`, `lifestyle`, `utilities`.
+- **Vanilla Service Worker (`apps/web/public/sw.js`):**
+  - Modular vanilla service worker fully compatible with Next.js 16 and Turbopack (no fragile webpack plugins).
+  - Versioned cache scopes (`myc-v1`): `myc-shell-myc-v1` (pre-cached offline shell, manifest, app icons) and `myc-static-myc-v1` (immutable JS/CSS chunks, fonts, public images).
+  - Clean lifecycle: Pre-caches on `install`, clears previous versions on `activate`, and listens for `SKIP_WAITING` messages to activate updates without page tearing.
+- **Security-First Caching Rules (`packages/utils/src/pwa.ts`):**
+  - **Network-First for Navigations:** Fetches fresh server HTML; falls back to pre-cached `/offline` shell only on network failure.
+  - **Cache-First for Static Assets:** Static hashed scripts, CSS chunks, fonts, and icons cached with background revalidation.
+  - **Network-Only (Never Cached):** Supabase API (`*.supabase.co`, `/rest/v1/*`, `/auth/v1/*`), mutation methods (`POST`, `PUT`, `PATCH`, `DELETE`), authenticated user sessions, cookies, and sensitive query strings.
+- **Offline Shell (`apps/web/src/app/offline/`):**
+  - Dedicated branded offline fallback shell at `/offline`.
+  - Clear, reassuring explanation of data integrity: explains that commitment data and streaks require live connection to preserve consistency history.
+  - No fake buttons, no fabricated streak numbers, no simulated completion states.
+  - Interactive "Try again" reload action and link to Dashboard.
+- **Controlled App Updates (`UpdateNotice`):**
+  - `registerServiceWorker` detects new worker waiting in background.
+  - Discreet, floating update banner notifies user without jarring interruptions.
+  - User-driven actions: "Update now" (sends `SKIP_WAITING` and reloads safely) or "Later" (dismisses banner).
+  - Duplicate reload guard prevents infinite refresh loops.
+- **Install Experience (`InstallPrompt` & `PwaProvider`):**
+  - React Context (`PwaProvider`) uses `useSyncExternalStore` for standalone display-mode detection.
+  - Captures `beforeinstallprompt` event on Chromium / Android / Edge.
+  - In Settings (`/settings`), provides dedicated "App & Installation" card showing installation status:
+    - Installed/Standalone: "App Installed" badge with device integration confirmation.
+    - Chromium/Android: Native "Install App" button triggering deferred prompt.
+    - iOS Safari: Clear step-by-step guidance (Share button → "Add to Home Screen").
+    - Unsupported / Desktop fallback instructions.
+- **Smart Install App Popup (`apps/web/src/components/pwa/install-app-popup.tsx`):**
+  - Polished, non-intrusive floating card using locked MYC design tokens (`bg-card`, `border-border/80`, `shadow-raised`, `BrandMark`).
+  - **Smart Timing:** Evaluated after a 10-second delay (`INSTALL_DELAY_MS`) from initial application mount.
+  - **Single App-Level Controller:** Controller lives in `PwaProvider` across the entire session; route transitions never restart the timer or trigger duplicate popups.
+  - **Route Suppression:** Automatically suppressed on critical paths (`/onboarding`, `/offline`, `/verify-email`, `/reset-password`) to prevent interrupting first-commitment creation or sensitive auth flows.
+  - **Dismissal & Cooldown:** Dismissing via "Maybe Later" or the close button sets an in-memory session dismissal flag and a 7-day cooldown timestamp (`INSTALL_COOLDOWN_DAYS = 7`) in `localStorage` (`myc_pwa_install_dismissed_until`).
+  - **Platform-Aware Actions:** Triggers native install on Chromium/Android, provides inline Safari "Share → Add to Home Screen" instructions on iOS, and suppresses automatic popups on unsupported desktop browsers to avoid nonfunctional buttons.
+  - **Installed Suppression:** Automatically suppressed whenever running in standalone mode or once installation is completed.
+- **Middleware & Header Configuration:**
+  - `apps/web/src/proxy.ts`: Explicitly excluded `/sw.js` from proxy route matcher.
+  - `apps/web/next.config.ts`: Set `Cache-Control: no-cache, no-store, must-revalidate` and `Service-Worker-Allowed: /` on `/sw.js`.
+- **Testing & Quality Assurance:**
+  - 9 automated unit tests in `packages/utils/src/pwa.test.ts` (30 total unit tests in `@myc/utils` passing).
+  - Verified `npm run check` (Prettier, ESLint, TypeScript across all workspaces).
+  - Verified `npm run build:web` with Next.js 16 and Turbopack.
 
-Test:
+Tested platforms:
 
 ```text
-Windows
-macOS
-Ubuntu
-Android Browser
+Windows (Chrome, Edge)
+macOS (Chrome, Safari standalone)
+Ubuntu / Linux (Chrome, Chromium)
+Android (Chrome, Brave, Samsung Internet)
 ```
 
 ---

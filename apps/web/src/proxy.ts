@@ -113,6 +113,6 @@ export const config = {
      * - dev routes (/api/dev/...)
      * - static image and icon extensions
      */
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|icons/|api/dev/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png|manifest.webmanifest|icons/|sw.js|api/dev/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
