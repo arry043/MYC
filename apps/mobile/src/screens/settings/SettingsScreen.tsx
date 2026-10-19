@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
-import { signInWithGoogleMobile, signOutMobile } from "@/lib/auth";
+import { signInWithGoogleMobile, signOutAllDevicesMobile, signOutMobile } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { colors, radii, shadows } from "@/lib/theme";
 
@@ -274,6 +274,31 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
     ]);
   };
 
+  const handleSignOutAllDevices = () => {
+    Alert.alert(
+      "Sign Out From All Devices?",
+      "This will end all active sessions across web browsers, mobile devices, and widgets. You will need to sign in again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Sign out all devices",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setActionLoading(true);
+              await signOutAllDevicesMobile();
+              onSignOut();
+            } catch (err) {
+              Alert.alert("Error", formatAuthError(err));
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const selectedReminderLabel =
     REMINDER_TIMES.find((t) => t.value === reminderTime)?.label || "8:00 PM";
 
@@ -487,23 +512,50 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
             <View style={styles.separator} />
 
             {/* Session Section */}
-            <View style={styles.sessionGroup}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.subHeading}>Session</Text>
-                <Text style={styles.fieldHint}>
-                  Signed in on this device. Sign out affects only this app session.
-                </Text>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.subHeading}>Session</Text>
+
+              {/* This Device */}
+              <View style={styles.sessionBox}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.sessionBoxTitle}>This device</Text>
+                  <Text style={styles.fieldHint}>
+                    Signed in on this device. Sign out affects only this app session.
+                  </Text>
+                </View>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onPress={handleLocalSignOut}
+                  style={styles.signOutBtn}
+                >
+                  <LogOut size={16} color={colors.foreground} />
+                  <Text style={styles.signOutBtnText}>Sign out</Text>
+                </Button>
               </View>
 
-              <Button
-                variant="secondary"
-                size="sm"
-                onPress={handleLocalSignOut}
-                style={styles.signOutBtn}
-              >
-                <LogOut size={16} color={colors.foreground} />
-                <Text style={styles.signOutBtnText}>Sign out</Text>
-              </Button>
+              {/* All Devices */}
+              <View style={[styles.sessionBox, styles.sessionBoxDanger]}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.sessionBoxTitle, { color: colors.destructive }]}>
+                    All active devices
+                  </Text>
+                  <Text style={styles.fieldHint}>
+                    End all active sessions across web browsers, mobile devices, and widgets.
+                  </Text>
+                </View>
+
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onPress={handleSignOutAllDevices}
+                  style={styles.signOutAllBtn}
+                >
+                  <LogOut size={16} color={colors.destructiveForeground} />
+                  <Text style={styles.signOutAllBtnText}>Sign Out From All Devices</Text>
+                </Button>
+              </View>
             </View>
           </Card>
         </View>
@@ -816,11 +868,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.primaryForeground,
   },
-  sessionGroup: {
+  sessionBox: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 16,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    backgroundColor: colors.card,
+    padding: 14,
+  },
+  sessionBoxDanger: {
+    borderColor: "rgba(239, 68, 68, 0.25)",
+    backgroundColor: "rgba(239, 68, 68, 0.03)",
+  },
+  sessionBoxTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.foreground,
   },
   signOutBtn: {
     flexDirection: "row",
@@ -831,6 +897,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     color: colors.foreground,
+    marginLeft: 4,
+  },
+  signOutAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  signOutAllBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.destructiveForeground,
     marginLeft: 4,
   },
   modalOverlay: {

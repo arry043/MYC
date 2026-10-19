@@ -140,3 +140,11 @@ export async function signOutMobile(): Promise<void> {
   const supabase = getSupabase();
   await supabase.auth.signOut({ scope: "local" });
 }
+
+/**
+ * Mobile global sign out from all devices (revokes all refresh tokens).
+ */
+export async function signOutAllDevicesMobile(): Promise<void> {
+  const supabase = getSupabase();
+  await supabase.auth.signOut({ scope: "global" });
+}
