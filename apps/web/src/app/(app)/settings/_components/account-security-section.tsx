@@ -71,6 +71,7 @@ export function AccountSecuritySection({ initialUser }: AccountSecuritySectionPr
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [isSettingNewPassword, setIsSettingNewPassword] = useState(false);
   const [unlinkDialogOpen, setUnlinkDialogOpen] = useState(false);
+  const [signOutAllDevicesDialogOpen, setSignOutAllDevicesDialogOpen] = useState(false);
 
   // Form states
   const [password, setPassword] = useState("");
@@ -313,6 +314,24 @@ export function AccountSecuritySection({ initialUser }: AccountSecuritySectionPr
     router.refresh();
   };
 
+  // Action: Global Sign Out (Sign Out From All Devices)
+  const handleSignOutAllDevices = async () => {
+    try {
+      setActionLoading(true);
+      const supabase = createClient();
+      await supabase.auth.signOut({ scope: "global" });
+      router.push("/login");
+      router.refresh();
+    } catch (err) {
+      toast({
+        title: "Could not sign out all devices",
+        description: formatAuthError(err),
+        tone: "error",
+      });
+      setActionLoading(false);
+    }
+  };
+
   const canUnlinkGoogle = canUnlinkProvider(identitiesSummary, "google");
 
   return (
@@ -478,17 +497,40 @@ export function AccountSecuritySection({ initialUser }: AccountSecuritySectionPr
           <Separator />
 
           {/* Session & Sign Out */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="grid gap-0.5">
-              <p className="type-label">Session</p>
-              <p className="type-small text-muted-foreground">
-                Signed in on this device. Sign out affects only this browser session.
-              </p>
+          <div className="grid gap-4">
+            <h3 className="type-label text-foreground">Session</h3>
+
+            {/* Current Device Session */}
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/70 p-4">
+              <div className="grid gap-0.5">
+                <p className="type-label">This device</p>
+                <p className="type-small text-muted-foreground">
+                  Signed in on this browser. Sign out affects only this session.
+                </p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={handleSignOut}>
+                <LogOutIcon className="size-4" />
+                Sign out
+              </Button>
             </div>
-            <Button variant="secondary" size="sm" onClick={handleSignOut}>
-              <LogOutIcon className="size-4" />
-              Sign out
-            </Button>
+
+            {/* All Devices Session */}
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-destructive/20 bg-destructive/[0.02] p-4">
+              <div className="grid gap-0.5">
+                <p className="type-label text-destructive">All active devices</p>
+                <p className="type-small text-muted-foreground">
+                  End all active sessions across web browsers, mobile devices, and widgets.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => setSignOutAllDevicesDialogOpen(true)}
+              >
+                <LogOutIcon className="size-4" />
+                Sign Out From All Devices
+              </Button>
+            </div>
           </div>
         </div>
       </Card>
@@ -576,6 +618,65 @@ export function AccountSecuritySection({ initialUser }: AccountSecuritySectionPr
             </Button>
             <Button variant="destructive" loading={actionLoading} onClick={handleUnlinkGoogle}>
               Disconnect Google
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sign Out All Devices Confirmation Dialog */}
+      <Dialog open={signOutAllDevicesDialogOpen} onOpenChange={setSignOutAllDevicesDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign out from all devices?</DialogTitle>
+            <DialogDescription>
+              This will immediately terminate all active sessions across all web browsers, mobile
+              devices, and widgets. You will need to sign in again.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setSignOutAllDevicesDialogOpen(false)}
+              disabled={actionLoading}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" loading={actionLoading} onClick={handleSignOutAllDevices}>
+              Sign out from all devices
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Sign Out All Devices Confirmation Dialog */}
+      <Dialog
+        open={signOutAllDevicesDialogOpen}
+        onOpenChange={setSignOutAllDevicesDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sign out from all devices?</DialogTitle>
+            <DialogDescription>
+              This will immediately terminate all active sessions across all web browsers, mobile
+              devices, and widgets. You will need to sign in again.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="ghost"
+              onClick={() => setSignOutAllDevicesDialogOpen(false)}
+              disabled={actionLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              loading={actionLoading}
+              onClick={handleSignOutAllDevices}
+            >
+              Sign out from all devices
             </Button>
           </DialogFooter>
         </DialogContent>
