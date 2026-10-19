@@ -304,6 +304,27 @@ Phase 13 establishes the installable Progressive Web App architecture:
   - **Platform-Aware Actions:** Triggers native install on Chromium/Android, provides inline Safari "Share → Add to Home Screen" instructions on iOS, and suppresses automatic popups on unsupported desktop browsers to avoid nonfunctional buttons.
   - **Permanent Suppression upon Installation:** When running in standalone mode or once installation succeeds, the popup is permanently suppressed.
 
+### D-31 · Native Android App Implementation with Expo, React Native, and Web/PWA UI Parity — 2026-10-19
+
+Phase 14 delivers the native Android client in `apps/mobile`:
+
+- **Single Source of Truth & Zero Duplicate Business Logic:**
+  - Database schema, RLS policies, and RPCs (`complete_commitment`, `confirm_first_commitment`, `ensure_profile`) remain the authoritative backend.
+  - Streaks, scores, consistency percentages, and date logic are computed strictly by `@myc/utils/src/consistency.ts`.
+  - Completions are permanently immutable across clients: completion cards do not allow unchecking or undoing, matching D-29.
+- **Secure Persistence via `expo-secure-store`:**
+  - Custom `ExpoSecureStoreAdapter` provides an asynchronous `getItem`, `setItem`, and `removeItem` interface directly mapping to Android Keystore / EncryptedSharedPreferences.
+  - Replaces volatile or unencrypted browser storage on Android for high security.
+- **Design Tokens & Geometry Parity with Mobile Web:**
+  - Token parity: warm off-white canvas (`#F8F7F4`), pure card surface (`#FFFFFF`), borders (`#E5E3DD`), text tokens, and pastel accent tones (`sky`, `lavender`, `peach`, `mint`, `sun`) matching `apps/web/src/app/globals.css`.
+  - Curved mobile navigation geometry: `AppHeader` features `rounded-b-[1.75rem]` (28px) and `BottomNav` features `rounded-t-[1.75rem]` (28px) with subtle elevation, matching the mobile web design.
+  - Header UserMenu dropdown: compact avatar modal with Profile, Settings, and Logout in exact order.
+  - Dedicated Profile page separated from Settings, matching Web route `/profile`.
+- **Default Calendar View:**
+  - Automatically loads in **Day view** for the user's current date, addressing the usability requirement for fast daily completion verification while supporting Day/Week/Month/Year view switching.
+- **Realtime Synchronization:**
+  - Subscribes to Supabase Realtime Postgres change events on `daily_completions` and `commitments`, ensuring immediate synchronization when actions happen on Web or another device.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.
