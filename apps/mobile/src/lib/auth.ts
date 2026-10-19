@@ -1,9 +1,12 @@
 import type { Session, User } from "@supabase/supabase-js";
+import * as WebBrowser from "expo-web-browser";
 import { AppState, type AppStateStatus, Linking } from "react-native";
 
 import { formatAuthError, parseAuthCallbackParams } from "@myc/utils";
 
 import { getSupabase } from "@/lib/supabase";
+
+WebBrowser.maybeCompleteAuthSession();
 
 /**
  * Handles incoming OAuth callback or confirmation deep links (`myc://...`).
@@ -114,12 +117,14 @@ export async function signInWithGoogleMobile(): Promise<{ ok: boolean; error?: s
     }
 
     if (data?.url) {
-      const canOpen = await Linking.canOpenURL(data.url);
-      if (canOpen) {
-        await Linking.openURL(data.url);
-        return { ok: true };
+      const res = await WebBrowser.openAuthSessionAsync(data.url, "myc://auth/callback");
+      if (res.type === "success" && res.url) {
+        return await handleAuthUrl(res.url);
       }
-      return { ok: false, error: "Unable to launch system browser for Google sign in." };
+      if (res.type === "cancel" || res.type === "dismiss") {
+        return { ok: false, error: "Sign in with Google was cancelled." };
+      }
+      return { ok: true };
     }
 
     return { ok: true };

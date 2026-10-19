@@ -39,7 +39,7 @@ PHASE 1
 ├── 12. Analytics Dashboard         ✅
 ├── Fix. Immutable Completions, Notes & Realtime ✅
 ├── 13. PWA                     ✅
-├── 14. Android App
+├── 14. Android App                 ✅
 ├── 15. Android Widget
 ├── 16. Cross-Platform Sync
 ├── 17. Notifications
@@ -542,29 +542,57 @@ Android (Chrome, Brave, Samsung Internet)
 
 ---
 
-# 14 — Android App
+# 14 — Android App ✅
 
-Now create the mobile client.
+The native Android client for MYC built using Expo SDK 57 and React Native 0.86 with New Architecture.
 
-Using:
+**Zero Duplicate Business Logic:**
 
-**Expo + React Native**
+- Uses the same Supabase database, RLS policies, RPCs (`complete_commitment`, `confirm_first_commitment`, `ensure_profile`), and pure consistency engine calculations in `@myc/utils`.
+- Adheres strictly to permanent completion immutability (no unchecking/undoing, optional activity comment up to 1,000 characters, user local calendar dates).
 
-Implement:
+**Implemented Features & Parity:**
 
-- Auth
-- Session persistence
-- Dashboard
-- Today's commitments
-- Completion
-- Calendar
-- Profile/settings
-
-Important:
-
-**Do NOT create separate business logic.**
-
-Android uses the same MYC backend.
+- **Authentication & Persistence (`src/screens/auth/AuthScreen.tsx`):**
+  - Sign in, Sign up, Forgot password, and verification notice.
+  - Native Google OAuth flow with `WebBrowser.openAuthSessionAsync` and custom scheme `myc://auth/callback`.
+  - Secure session persistence backed by `expo-secure-store` via `ExpoSecureStoreAdapter`.
+- **Design System & Tokens (`src/lib/theme.ts`):**
+  - Identical palette: warm off-white canvas, crisp card surface, muted borders, text colors, and pastel tones (`sky`, `lavender`, `peach`, `mint`, `sun`).
+  - Consistent elevation shadows and typography.
+  - Reusable UI primitives: `Button`, `Card`, `Badge`, `Input`, `SegmentedControl`, `Modal`, `BrandMark`, `StatCard`, `ProgressBar`, `ProgressRing`.
+- **Curved Navigation Shell (`src/components/layout/`):**
+  - `AppHeader`: Smooth curved bottom edge (`rounded-b-[1.75rem]`), BrandMark logo, and avatar dropdown modal containing **Profile**, **Settings**, and **Logout** in exact parity with the web mobile layout.
+  - `BottomNav`: Fixed navigation bar with smooth curved top edge (`rounded-t-[1.75rem]`), elevated shadow, active indicator pill, and quick navigation between Dashboard, Calendar, Commitments, and Analytics.
+- **Dashboard (`src/screens/dashboard/DashboardScreen.tsx`):**
+  - Supabase Realtime subscription on `daily_completions` and `commitments` for instant cross-device updates.
+  - 4 core metrics (Today's score, Current streak, Best streak, Total active).
+  - "Today's Focus" hero card with circular `ProgressRing`.
+  - Today's commitment list with permanent completion status and modal trigger.
+  - 7-day mini consistency column chart.
+- **Calendar (`src/screens/calendar/CalendarScreen.tsx`):**
+  - Automatically defaults to **Day view** for the current date.
+  - Day, Week, Month, and Year view switcher with consistent segmented control.
+  - Commitment filter bar with pill selectors.
+  - Previous / next period navigation with today jump button.
+  - Day view with completion action and activity history log with notes.
+  - Month contribution grid with intensity levels 0..4.
+- **Commitments Management (`src/screens/commitments/CommitmentsScreen.tsx`):**
+  - Active, Paused, and Archived segmented tabs.
+  - Rich commitment cards with tone accent bars, schedule badges, completion actions, and history modals.
+  - Pause, resume, archive, restore, and delete actions with confirmation dialogs.
+  - `CommitmentFormModal` for creating new commitments with frequency picker, day selectors, and pledge.
+- **Analytics Dashboard (`src/screens/analytics/AnalyticsScreen.tsx`):**
+  - Lifetime metric cards (Current streak, Best streak, Consistent days, Overall consistency %).
+  - Period selector: 7d, 30d, year, all.
+  - Circular progress ring, monthly consistency bar chart, and commitment performance breakdown.
+- **Dedicated Profile & Settings:**
+  - `ProfileScreen.tsx`: Dedicated Profile page showing email, verified badge, member-since date, journey day count, and searchable timezone picker modal.
+  - `SettingsScreen.tsx`: Change password modal, password reset via email, Google account connect/disconnect with lockout protection, local sign out, and global sign out.
+- **Quality Gates:**
+  - `npm run check` passes across all monorepo packages.
+  - `npm run build:web` passes.
+  - `npx expo-doctor` passed with 21/21 checks passing.
 
 ---
 
