@@ -17,6 +17,7 @@ export {
 export {
   VALID_TONES,
   WEEKDAYS,
+  formatCommitmentDate,
   formatFrequency,
   getUserLocalDateString,
   isValidTimezone,

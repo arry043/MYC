@@ -230,19 +230,27 @@ export function CalendarView({ initialData }: CalendarViewProps) {
     return selectedDate <= mycStartedAt;
   };
 
+  const maxScheduledYear = Math.max(
+    currentYear + 1,
+    ...commitments
+      .filter((c) => c.scheduled_date)
+      .map((c) => Number(c.scheduled_date!.slice(0, 4))),
+  );
+  const maxMonthKey = `${maxScheduledYear}-12`;
+  const maxDate = `${maxScheduledYear}-12-31`;
+
   const isNextDisabled = () => {
     if (isPending || !mycStartedAt) return true;
-    if (view === "year") return selectedYear >= currentYear;
+    if (view === "year") return selectedYear >= maxScheduledYear;
     if (view === "month") {
       const currentMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-      const todayMonthKey = todayDate.slice(0, 7);
-      return currentMonthKey >= todayMonthKey;
+      return currentMonthKey >= maxMonthKey;
     }
     if (view === "week") {
       const weekRange = getWeekDateRange(selectedDate);
-      return weekRange.endDate >= todayDate;
+      return weekRange.endDate >= maxDate;
     }
-    return selectedDate >= todayDate;
+    return selectedDate >= maxDate;
   };
 
   // Label for active period in nav bar

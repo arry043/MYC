@@ -11,7 +11,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { AnalyticsPageData, AnalyticsReportingPeriod } from "@myc/types";
-import { formatMonthYear, getAnalyticsData } from "@myc/utils";
+import { formatFrequency, formatMonthYear, getAnalyticsData } from "@myc/utils";
 
 import { AnalyticsChart } from "@/components/shared/AnalyticsChart";
 import { Skeleton } from "@/components/shared/Motion";
@@ -377,9 +377,11 @@ export function AnalyticsScreen({ onNavigateToCommitments }: AnalyticsScreenProp
                         <View style={{ flex: 1 }}>
                           <Text style={styles.perfTitle}>{perf.commitment.title}</Text>
                           <Text style={styles.perfSub}>
-                            {perf.commitment.frequency === "daily"
-                              ? "Every day"
-                              : "Specific scheduled days"}{" "}
+                            {formatFrequency(
+                              perf.commitment.frequency,
+                              perf.commitment.schedule_days,
+                              perf.commitment.scheduled_date,
+                            )}{" "}
                             · {periodLabelText}
                           </Text>
                         </View>

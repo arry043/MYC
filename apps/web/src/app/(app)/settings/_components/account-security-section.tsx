@@ -650,10 +650,7 @@ export function AccountSecuritySection({ initialUser }: AccountSecuritySectionPr
       </Dialog>
 
       {/* Sign Out All Devices Confirmation Dialog */}
-      <Dialog
-        open={signOutAllDevicesDialogOpen}
-        onOpenChange={setSignOutAllDevicesDialogOpen}
-      >
+      <Dialog open={signOutAllDevicesDialogOpen} onOpenChange={setSignOutAllDevicesDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Sign out from all devices?</DialogTitle>
@@ -671,11 +668,7 @@ export function AccountSecuritySection({ initialUser }: AccountSecuritySectionPr
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              loading={actionLoading}
-              onClick={handleSignOutAllDevices}
-            >
+            <Button variant="destructive" loading={actionLoading} onClick={handleSignOutAllDevices}>
               Sign out from all devices
             </Button>
           </DialogFooter>

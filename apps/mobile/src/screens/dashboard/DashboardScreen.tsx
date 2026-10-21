@@ -28,6 +28,7 @@ import {
   getDashboardConsistencyData,
   getDateRange,
   getUserLocalDateString,
+  isCommitmentExpectedOnDate,
 } from "@myc/utils";
 
 import { CommitmentHistoryModal } from "@/components/commitments/CommitmentHistoryModal";
@@ -182,14 +183,9 @@ export function DashboardScreen({ onNavigateToCommitments }: DashboardScreenProp
   const start7Day = addDays(todayDate, -6);
   const last7Days = getDateRange(start7Day, todayDate);
   const weekChartPoints: AnalyticsChartPoint[] = last7Days.map((d) => {
-    const expected = allCommitments.filter((c) => {
-      if (c.status !== "active") return false;
-      if (c.start_date && c.start_date > d) return false;
-      if (c.end_date && c.end_date < d) return false;
-      if (c.frequency === "daily") return true;
-      const dayOfWeek = new Date(d).getUTCDay() || 7;
-      return (c.schedule_days || []).includes(dayOfWeek);
-    }).length;
+    const expected = allCommitments.filter((c) =>
+      isCommitmentExpectedOnDate(c, d, profile?.myc_started_at),
+    ).length;
 
     const completed = weekCompletions.filter((c) => c.date === d).length;
     const pct = expected > 0 ? Math.round((completed / expected) * 100) : null;
@@ -423,6 +419,7 @@ export function DashboardScreen({ onNavigateToCommitments }: DashboardScreenProp
                               {formatFrequency(
                                 item.commitment.frequency,
                                 item.commitment.schedule_days,
+                                item.commitment.scheduled_date,
                               )}
                             </Text>
 

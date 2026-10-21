@@ -4,7 +4,7 @@ export type Profile = Tables<"profiles">;
 export type Commitment = Tables<"commitments">;
 
 export type CommitmentStatus = "draft" | "active" | "paused" | "archived";
-export type CommitmentFrequency = "daily" | "specific_days";
+export type CommitmentFrequency = "daily" | "specific_days" | "single_day";
 export type CommitmentTone = "sky" | "lavender" | "peach" | "mint" | "sun";
 
 export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
@@ -14,6 +14,7 @@ export interface CreateCommitmentInput {
   description?: string | null;
   frequency: CommitmentFrequency;
   schedule_days?: Weekday[] | null;
+  scheduled_date?: string | null;
   start_date?: string;
   end_date?: string | null;
   tone?: CommitmentTone;
@@ -24,6 +25,7 @@ export interface UpdateCommitmentInput {
   description?: string | null;
   frequency?: CommitmentFrequency;
   schedule_days?: Weekday[] | null;
+  scheduled_date?: string | null;
   start_date?: string;
   end_date?: string | null;
   status?: CommitmentStatus;

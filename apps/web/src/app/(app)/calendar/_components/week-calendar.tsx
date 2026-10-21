@@ -58,7 +58,7 @@ export function WeekCalendar({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-7">
         {days.map((day) => {
           const isSelected = day.date === selectedDate;
-          const isInteractive = !day.isFuture && !day.isPreJourney;
+          const isInteractive = !day.isPreJourney;
           const weekdayName = weekdayFullNames[day.isoWeekday - 1] ?? "Day";
 
           return (

@@ -50,7 +50,10 @@ export function getUserLocalDateString(timezone?: string): string {
 /**
  * Validates a commitment creation input.
  */
-export function validateCommitmentInput(input: Partial<CreateCommitmentInput>): {
+export function validateCommitmentInput(
+  input: Partial<CreateCommitmentInput>,
+  userTimezone?: string,
+): {
   valid: boolean;
   errors: Record<string, string>;
 } {
@@ -68,7 +71,7 @@ export function validateCommitmentInput(input: Partial<CreateCommitmentInput>): 
   }
 
   const frequency = input.frequency as CommitmentFrequency;
-  if (!frequency || !["daily", "specific_days"].includes(frequency)) {
+  if (!frequency || !["daily", "specific_days", "single_day"].includes(frequency)) {
     errors.frequency = "Please choose a valid frequency";
   } else if (frequency === "specific_days") {
     const days = input.schedule_days;
@@ -80,6 +83,18 @@ export function validateCommitmentInput(input: Partial<CreateCommitmentInput>): 
       );
       if (!validDays) {
         errors.schedule_days = "Selected days must be valid weekdays (1–7)";
+      }
+    }
+  } else if (frequency === "single_day") {
+    const scheduledDate = input.scheduled_date?.trim();
+    if (!scheduledDate) {
+      errors.scheduled_date = "Please select a date for this commitment";
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(scheduledDate)) {
+      errors.scheduled_date = "Invalid date format (must be YYYY-MM-DD)";
+    } else {
+      const today = getUserLocalDateString(userTimezone);
+      if (scheduledDate < today) {
+        errors.scheduled_date = "Scheduled date cannot be in the past";
       }
     }
   }
@@ -101,11 +116,39 @@ export function validateCommitmentInput(input: Partial<CreateCommitmentInput>): 
 }
 
 /**
+ * Formats a YYYY-MM-DD date string into a friendly localized date (e.g., 'Oct 25, 2026').
+ */
+export function formatCommitmentDate(dateStr: string): string {
+  const parts = dateStr.split("-").map(Number);
+  const year = parts[0] ?? 2026;
+  const month = parts[1] ?? 1;
+  const day = parts[2] ?? 1;
+  const d = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(d);
+}
+
+/**
  * Human-readable format for commitment frequency.
  */
-export function formatFrequency(frequency: string, scheduleDays?: number[] | null): string {
+export function formatFrequency(
+  frequency: string,
+  scheduleDays?: number[] | null,
+  scheduledDate?: string | null,
+): string {
   if (frequency === "daily") {
     return "Every day";
+  }
+
+  if (frequency === "single_day") {
+    if (scheduledDate) {
+      return `Single day · ${formatCommitmentDate(scheduledDate)}`;
+    }
+    return "Single day";
   }
 
   if (frequency === "specific_days" && scheduleDays && scheduleDays.length > 0) {

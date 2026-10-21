@@ -153,7 +153,7 @@ export function YearCalendar({
 
                   {monthDays.map((day) => {
                     const isSelected = day.date === selectedDate;
-                    const isInteractive = !day.isFuture && !day.isPreJourney;
+                    const isInteractive = !day.isPreJourney;
 
                     const tooltipText = day.isFuture
                       ? `${day.date}: Upcoming date`

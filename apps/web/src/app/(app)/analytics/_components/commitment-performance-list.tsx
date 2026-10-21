@@ -3,6 +3,7 @@
 import { cn } from "cn";
 
 import type { CommitmentPerformance } from "@myc/types";
+import { formatFrequency } from "@myc/utils";
 
 import { LinearProgress } from "@/components/progress/linear-progress";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +49,12 @@ export function CommitmentPerformanceList({
                   <div>
                     <h3 className="type-h3 leading-tight">{commitment.title}</h3>
                     <p className="type-caption text-muted-foreground">
-                      {commitment.frequency === "daily" ? "Every day" : "Specific scheduled days"} ·{" "}
-                      {periodLabel}
+                      {formatFrequency(
+                        commitment.frequency,
+                        commitment.schedule_days,
+                        commitment.scheduled_date,
+                      )}{" "}
+                      · {periodLabel}
                     </p>
                   </div>
                 </div>

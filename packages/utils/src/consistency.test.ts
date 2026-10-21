@@ -33,6 +33,7 @@ function makeCommitment(overrides: Partial<Commitment> = {}): Commitment {
     description: null,
     frequency: "daily",
     schedule_days: [1, 2, 3, 4, 5, 6, 7],
+    scheduled_date: null,
     start_date: "2026-10-01",
     end_date: null,
     status: "active",
@@ -93,6 +94,29 @@ test("scheduling: isCommitmentExpectedOnDate", () => {
   assert.equal(isCommitmentExpectedOnDate(mw, "2026-10-13", "2026-10-01"), false);
   // 2026-10-14 is Wednesday (3)
   assert.equal(isCommitmentExpectedOnDate(mw, "2026-10-14", "2026-10-01"), true);
+
+  // Single day commitment scheduled on 2026-10-25
+  const single = makeCommitment({
+    frequency: "single_day",
+    schedule_days: null,
+    scheduled_date: "2026-10-25",
+    start_date: "2026-10-25",
+    end_date: "2026-10-25",
+    status: "active",
+  });
+  // Expected only on 2026-10-25
+  assert.equal(isCommitmentExpectedOnDate(single, "2026-10-25", "2026-10-01"), true);
+  // Not expected on any other day before or after
+  assert.equal(isCommitmentExpectedOnDate(single, "2026-10-24", "2026-10-01"), false);
+  assert.equal(isCommitmentExpectedOnDate(single, "2026-10-26", "2026-10-01"), false);
+
+  // Paused single day commitment is not expected
+  const pausedSingle = makeCommitment({
+    frequency: "single_day",
+    scheduled_date: "2026-10-25",
+    status: "paused",
+  });
+  assert.equal(isCommitmentExpectedOnDate(pausedSingle, "2026-10-25", "2026-10-01"), false);
 });
 
 test("daily score: 4/4 = 100%, 3/4 = 75%, 0/4 = 0%, 0 expected = null", () => {
@@ -539,6 +563,136 @@ test("period summary & commitment performances", () => {
   assert.equal(workoutPerf?.expectedInstances, 2);
   assert.equal(workoutPerf?.completedInstances, 1);
   assert.equal(workoutPerf?.percentage, 50);
+});
+
+test("Single Day commitment correctly integrates with streaks, daily scores, and period summary", () => {
+  const daily = makeCommitment({
+    id: "daily_1",
+    frequency: "daily",
+    start_date: "2026-10-01",
+    status: "active",
+  });
+
+  const singleDay = makeCommitment({
+    id: "single_1",
+    title: "Quarterly Review",
+    frequency: "single_day",
+    scheduled_date: "2026-10-02",
+    start_date: "2026-10-02",
+    end_date: "2026-10-02",
+    schedule_days: null,
+    status: "active",
+  });
+
+  const futureSingle = makeCommitment({
+    id: "single_future",
+    title: "Next Year Conference",
+    frequency: "single_day",
+    scheduled_date: "2026-12-15",
+    start_date: "2026-12-15",
+    end_date: "2026-12-15",
+    schedule_days: null,
+    status: "active",
+  });
+
+  const commitments = [daily, singleDay, futureSingle];
+
+  // Case 1: On 2026-10-01, only daily is expected
+  const expDay1 = getExpectedCommitmentsForDate(commitments, "2026-10-01", "2026-10-01");
+  assert.equal(expDay1.length, 1);
+  assert.equal(expDay1[0]?.id, "daily_1");
+
+  // Case 2: On 2026-10-02, both daily and singleDay are expected, futureSingle is NOT
+  const expDay2 = getExpectedCommitmentsForDate(commitments, "2026-10-02", "2026-10-01");
+  assert.equal(expDay2.length, 2);
+  assert.deepEqual(expDay2.map((c) => c.id).sort(), ["daily_1", "single_1"]);
+
+  // Case 3: On 2026-10-03, only daily is expected (singleDay does not repeat)
+  const expDay3 = getExpectedCommitmentsForDate(commitments, "2026-10-03", "2026-10-01");
+  assert.equal(expDay3.length, 1);
+  assert.equal(expDay3[0]?.id, "daily_1");
+
+  // Completions:
+  // 10-01: daily completed -> consistent
+  // 10-02: daily completed and singleDay completed -> consistent
+  // 10-03: daily completed -> consistent
+  const completions: DailyCompletion[] = [
+    {
+      id: "c_1",
+      user_id: "u1",
+      commitment_id: "daily_1",
+      date: "2026-10-01",
+      status: "completed",
+      completed_at: "2026-10-01T10:00:00Z",
+      created_at: "2026-10-01T10:00:00Z",
+      comment: null,
+    },
+    {
+      id: "c_2",
+      user_id: "u1",
+      commitment_id: "daily_1",
+      date: "2026-10-02",
+      status: "completed",
+      completed_at: "2026-10-02T10:00:00Z",
+      created_at: "2026-10-02T10:00:00Z",
+      comment: null,
+    },
+    {
+      id: "c_3",
+      user_id: "u1",
+      commitment_id: "single_1",
+      date: "2026-10-02",
+      status: "completed",
+      completed_at: "2026-10-02T11:00:00Z",
+      created_at: "2026-10-02T11:00:00Z",
+      comment: "All quarterly goals met",
+    },
+    {
+      id: "c_4",
+      user_id: "u1",
+      commitment_id: "daily_1",
+      date: "2026-10-03",
+      status: "completed",
+      completed_at: "2026-10-03T10:00:00Z",
+      created_at: "2026-10-03T10:00:00Z",
+      comment: null,
+    },
+  ];
+
+  const metrics = calculateConsistencyMetrics({
+    commitments,
+    completions,
+    timezone: "UTC",
+    mycStartedAt: "2026-10-01",
+    targetDate: "2026-10-03",
+  });
+
+  // 3 consistent days, current streak = 3, total expected = 4 (1 + 2 + 1), total completed = 4
+  assert.equal(metrics.consistentDays, 3);
+  assert.equal(metrics.currentStreak, 3);
+  assert.equal(metrics.totalExpectedCommitmentDays, 4);
+  assert.equal(metrics.totalCompletedCommitmentDays, 4);
+  assert.equal(metrics.overallPercentage, 100);
+
+  // In commitment performance breakdown
+  const perfs = calculateCommitmentPerformances(
+    commitments,
+    completions,
+    "2026-10-01",
+    "2026-10-03",
+    "2026-10-01",
+    "2026-10-03",
+  );
+
+  const singlePerf = perfs.find((p) => p.commitment.id === "single_1");
+  assert.equal(singlePerf?.expectedInstances, 1);
+  assert.equal(singlePerf?.completedInstances, 1);
+  assert.equal(singlePerf?.percentage, 100);
+
+  const futurePerf = perfs.find((p) => p.commitment.id === "single_future");
+  assert.equal(futurePerf?.expectedInstances, 0);
+  assert.equal(futurePerf?.completedInstances, 0);
+  assert.equal(futurePerf?.percentage, null);
 });
 
 test("formatCompletionTimestamp and formatCompletionTimeOnly render correctly in user timezone", () => {
