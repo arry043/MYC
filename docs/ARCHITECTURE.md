@@ -36,7 +36,7 @@ change must follow see [RULES.md](RULES.md); for the reasoning behind specific c
                 │ apps/web              │          │ apps/mobile               │
                 │ Next.js 16 · PWA      │          │ Expo 57 · React Native    │
                 │ desktop + mobile web  │          │ Android app               │
-                └───────────────────────┘          │  └─ Android widget (planned)
+                └───────────────────────┘          │  └─ Android widgets (A, B, C) ✅
                                                    └───────────────────────────┘
                      └─────────── packages/types · packages/utils ───────────┘
 ```
@@ -47,16 +47,16 @@ the only authorization layer that matters; client checks exist only for UX.
 
 ## 3. Repository layout
 
-| Path                              | Responsibility                                                           |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| `apps/web`                        | Next.js web app and installable PWA                                      |
-| `apps/mobile`                     | Expo / React Native app (Android first); later hosts the Android widget  |
-| `packages/types` (`@myc/types`)   | Shared TypeScript types. `src/database.ts` is generated from the schema  |
-| `packages/utils` (`@myc/utils`)   | Platform-agnostic helpers usable in browser, Node and React Native       |
-| `packages/config` (`@myc/config`) | Shared tsconfig bases and ESLint rules                                   |
-| `supabase/`                       | Database schema (migrations), database tests, Edge Functions, CLI config |
-| `scripts/`                        | Repository scripts (database type generation)                            |
-| `docs/`                           | Product and engineering documentation                                    |
+| Path                              | Responsibility                                                                               |
+| --------------------------------- | -------------------------------------------------------------------------------------------- |
+| `apps/web`                        | Next.js web app and installable PWA                                                          |
+| `apps/mobile`                     | Expo / React Native app (Android) and native home-screen widgets (Compact, Today, Dashboard) |
+| `packages/types` (`@myc/types`)   | Shared TypeScript types. `src/database.ts` is generated from the schema                      |
+| `packages/utils` (`@myc/utils`)   | Platform-agnostic helpers usable in browser, Node and React Native                           |
+| `packages/config` (`@myc/config`) | Shared tsconfig bases and ESLint rules                                                       |
+| `supabase/`                       | Database schema (migrations), database tests, Edge Functions, CLI config                     |
+| `scripts/`                        | Repository scripts (database type generation)                                                |
+| `docs/`                           | Product and engineering documentation                                                        |
 
 npm workspaces link everything. Shared packages are **TypeScript source with no build step**:
 Next.js (Turbopack) and Metro compile workspace packages directly, so a change in

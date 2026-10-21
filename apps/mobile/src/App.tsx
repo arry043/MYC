@@ -1,7 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AppHeader } from "@/components/layout/AppHeader";
@@ -9,6 +9,7 @@ import { BottomNav, type TabKey } from "@/components/layout/BottomNav";
 import { ScreenTransition } from "@/components/shared/Motion";
 import { setupMobileAuth, signOutMobile } from "@/lib/auth";
 import { colors } from "@/lib/theme";
+import { clearWidgets } from "@/lib/widgets";
 import { AnalyticsScreen } from "@/screens/analytics/AnalyticsScreen";
 import { AuthScreen } from "@/screens/auth/AuthScreen";
 import { CalendarScreen } from "@/screens/calendar/CalendarScreen";
@@ -23,6 +24,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeScreen, setActiveScreen] = useState<ScreenState>("dashboard");
+  const [deepLinkTarget, setDeepLinkTarget] = useState<{
+    commitmentId: string;
+    action: "complete" | "detail";
+  } | null>(null);
 
   useEffect(() => {
     const cleanup = setupMobileAuth((user) => {
@@ -32,7 +37,50 @@ export default function App() {
     return cleanup;
   }, []);
 
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url || !url.startsWith("myc://")) return;
+      if (url.includes("code=") || url.includes("access_token=") || url.includes("error=")) {
+        return;
+      }
+
+      try {
+        const pathWithoutScheme = url.replace(/^myc:\/\//, "");
+        const [pathPart, queryPart] = pathWithoutScheme.split("?");
+        if (!pathPart) return;
+
+        if (pathPart === "dashboard") {
+          setActiveScreen("dashboard");
+        } else if (pathPart.startsWith("commitment/")) {
+          const commitmentId = pathPart.replace("commitment/", "");
+          const params = new URLSearchParams(queryPart || "");
+          const action = params.get("action") === "detail" ? "detail" : "complete";
+
+          setActiveScreen("dashboard");
+          setDeepLinkTarget({ commitmentId, action });
+        } else if (pathPart === "auth") {
+          setActiveScreen("dashboard");
+        }
+      } catch (err) {
+        console.warn("Failed to handle deep link:", err);
+      }
+    };
+
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      handleUrl(url);
+    });
+
+    void Linking.getInitialURL().then((initialUrl) => {
+      handleUrl(initialUrl);
+    });
+
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   const handleSignOut = async () => {
+    await clearWidgets();
     await signOutMobile();
     setCurrentUser(null);
     setActiveScreen("dashboard");
@@ -98,6 +146,8 @@ export default function App() {
               <DashboardScreen
                 onNavigateToCalendar={() => setActiveScreen("calendar")}
                 onNavigateToCommitments={() => setActiveScreen("commitments")}
+                deepLinkTarget={deepLinkTarget}
+                onClearDeepLinkTarget={() => setDeepLinkTarget(null)}
               />
             )}
 

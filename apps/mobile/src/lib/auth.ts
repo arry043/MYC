@@ -5,6 +5,7 @@ import { AppState, type AppStateStatus, Linking } from "react-native";
 import { formatAuthError, parseAuthCallbackParams } from "@myc/utils";
 
 import { getSupabase } from "@/lib/supabase";
+import { clearWidgets } from "@/lib/widgets";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -137,6 +138,7 @@ export async function signInWithGoogleMobile(): Promise<{ ok: boolean; error?: s
  * Mobile local sign out (Requirement §6).
  */
 export async function signOutMobile(): Promise<void> {
+  await clearWidgets();
   const supabase = getSupabase();
   await supabase.auth.signOut({ scope: "local" });
 }
@@ -145,6 +147,7 @@ export async function signOutMobile(): Promise<void> {
  * Mobile global sign out from all devices (revokes all refresh tokens).
  */
 export async function signOutAllDevicesMobile(): Promise<void> {
+  await clearWidgets();
   const supabase = getSupabase();
   await supabase.auth.signOut({ scope: "global" });
 }

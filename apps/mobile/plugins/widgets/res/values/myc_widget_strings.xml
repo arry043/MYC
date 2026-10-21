@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_compact_name">MYC Compact</string>
+    <string name="widget_compact_desc">Today\'s completion count and streak</string>
+    <string name="widget_standard_name">MYC Today</string>
+    <string name="widget_standard_desc">Today\'s scheduled commitments with status and progress</string>
+    <string name="widget_large_name">MYC Dashboard</string>
+    <string name="widget_large_desc">Consistency dashboard with commitments, progress, and streak records</string>
+</resources>
+

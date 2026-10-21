@@ -20,6 +20,11 @@
       },
       "predictiveBackGestureEnabled": false
     },
-    "plugins": ["expo-sqlite", "expo-secure-store", "expo-web-browser"]
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-web-browser",
+      "./plugins/withAndroidWidgets"
+    ]
   }
 }

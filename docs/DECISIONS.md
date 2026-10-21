@@ -357,6 +357,29 @@ Users can now schedule one-time commitments scheduled for a specific date (today
   - `scheduled_date` is persisted as a clean SQL `date` type (`YYYY-MM-DD`).
   - Natural integration point for Phase 17: Scheduled background workers/cron (Supabase `pg_cron` or Edge Functions) can query `commitments WHERE frequency = 'single_day' AND scheduled_date = current_date + interval 'N days'` combined with user timezone to trigger FCM/APNs push notifications without schema changes.
 
+### D-16 · Native Android Home Screen Widgets via Continuous Native Generation (CNG) — 2026-10-21
+
+Home-screen widgets require native Android APIs (`AppWidgetProvider`, `RemoteViews`, `SharedPreferences`), while the MYC mobile application follows Expo Continuous Native Generation (CNG) where native `android/` directories are transient and generated via `expo prebuild`.
+
+- **Expo Config Plugin Architecture:**
+  - Implemented `apps/mobile/plugins/withAndroidWidgets.js` as an Expo Config Plugin.
+  - Automatically manages `AndroidManifest.xml` receiver declarations (`CompactWidgetProvider`, `StandardWidgetProvider`, `LargeWidgetProvider`).
+  - Injects `MycWidgetPackage` registration into `MainApplication.kt` (`PackageList(this).packages.apply { add(...) }`).
+  - Maintains source XML resources (drawables, layouts, provider infos, strings, colors) and Kotlin classes cleanly under `apps/mobile/plugins/widgets/` and safely outputs them into Android directories on prebuild.
+- **Three Native Widget Types & Size Adaptation:**
+  - **Widget A (Compact):** 2x1/2x2 cells, branding, today's completion count (e.g. `2/3`), streak flame (`🔥 14d`), mini progress bar.
+  - **Widget B (Standard):** 3x2/4x2 default widget, today's scheduled commitments with status checkboxes, completion ratio badge, streak pill, and overflow indicator (`+N more`). Responsive slots adapt smoothly based on launcher resizing.
+  - **Widget C (Large):** 4x3/4x4 consistency dashboard with current streak (`🔥 14 days`), best streak record (`🏆 21d best`), completion progress bar and percentage, commitment item list, and "Open MYC" quick action.
+- **Data Flow & Zero Business Logic Duplication:**
+  - Widgets render from an encrypted/private `SharedPreferences` snapshot (`myc_widget_prefs`).
+  - Zero streak or scheduling calculations in native code: snapshot payload is computed strictly in TypeScript via `@myc/utils` (`getDashboardConsistencyData`, `getUserLocalDateString`) and passed to native via `MycWidgetBridge.setWidgetData(payload)`.
+- **Security & Privacy:**
+  - No auth tokens, API secrets, passwords, or emails stored in widget storage. Only non-sensitive display properties (title, isCompleted, streak count, date).
+  - Clear widget data immediately on sign-out (`signOutMobile`, `signOutAllDevicesMobile`), rendering a neutral signed-out prompt with a deep link to sign in.
+- **Deep Linking Strategy:**
+  - PendingIntent URIs match the existing mobile scheme: `myc://dashboard`, `myc://commitment/<id>?action=complete|detail`, `myc://auth`.
+  - Tapping uncompleted commitment deep links directly to `CompleteCommitmentModal` in the foreground/cold-started app.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.

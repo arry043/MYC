@@ -37,6 +37,7 @@ import { Card } from "@/components/ui/Card";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { getSupabase } from "@/lib/supabase";
 import { colors, radii, shadows } from "@/lib/theme";
+import { syncWidgetsFromBackend } from "@/lib/widgets";
 
 const TILE_TONE: Record<string, { bg: string; text: string }> = {
   sky: { bg: "#E0F2FE", text: "#0369A1" },
@@ -99,6 +100,8 @@ export function CommitmentsScreen() {
       if (completionsData) {
         setTodayCompletions(completionsData as DailyCompletion[]);
       }
+
+      void syncWidgetsFromBackend();
     } catch (err) {
       console.error("Failed to load commitments:", err);
     } finally {
@@ -238,6 +241,7 @@ export function CommitmentsScreen() {
 
             setCommitments((prev) => prev.filter((c) => c.id !== commitment.id));
             setTodayCompletions((prev) => prev.filter((c) => c.commitment_id !== commitment.id));
+            void syncWidgetsFromBackend();
           },
         },
       ],

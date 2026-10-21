@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MYC Widget Color Palette -->
+    <color name="myc_bg">#F8FAFC</color>
+    <color name="myc_card_bg">#FFFFFF</color>
+    <color name="myc_border">#E2E8F0</color>
+    <color name="myc_primary">#0284C7</color>
+    <color name="myc_primary_dark">#0369A1</color>
+    <color name="myc_primary_light">#E0F2FE</color>
+    <color name="myc_text_main">#0F172A</color>
+    <color name="myc_text_muted">#64748B</color>
+    <color name="myc_text_subtle">#94A3B8</color>
+    <color name="myc_success">#16A34A</color>
+    <color name="myc_success_light">#DCFCE7</color>
+    <color name="myc_flame">#EA580C</color>
+    <color name="myc_flame_light">#FFEDD5</color>
+    <color name="myc_progress_bg">#E2E8F0</color>
+    <color name="myc_white">#FFFFFF</color>
+</resources>
+
