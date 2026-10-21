@@ -41,7 +41,7 @@ PHASE 1
 ├── 13. PWA                     ✅
 ├── 14. Android App                 ✅
 ├── Single Day Commitment           ✅
-├── 15. Android Widget
+├── 15. Android Widget              ✅
 ├── 16. Cross-Platform Sync
 ├── 17. Notifications
 ├── 18. Security & Edge Cases
@@ -631,11 +631,9 @@ Implemented a third commitment frequency, **Single Day**, across the entire MYC 
 
 ---
 
-# 15 — Android Home Screen Widget ⭐
+# 15 — Android Home Screen Widget ⭐ ✅
 
-This is one of the most important Phase-1 tasks.
-
-Widget should show:
+Implemented production-ready, native Android home-screen widgets for MYC (Make Yourself Consistent) with full continuous native generation (CNG) via an Expo config plugin.
 
 ```text
 ┌──────────────────┐
@@ -652,19 +650,29 @@ Widget should show:
 └──────────────────┘
 ```
 
-Implement:
+### Implemented:
 
-- Widget authentication strategy
-- Today's data
-- Completion count
-- Streak
-- Widget refresh
-- Widget → App deep link
-- Multiple widget sizes if feasible
-
-Then optionally:
-
-**Direct completion from widget.**
+- **Three Native Widget Types:**
+  - **Widget A (Compact):** Designed for 2x1/2x2 cells. Displays MYC brand pill, today's completion count (`2/3`), streak flame (`🔥 14d`), and mini progress bar. Tap opens Dashboard.
+  - **Widget B (Standard — Today's Commitments):** Default 3x2/4x2 widget. Displays today's scheduled commitments with completion icons (checked green circle vs subtle outline), completion progress badge (`2/3`), streak pill (`🔥 14 days`), and overflow indicator (`+N more`). Responsive slots adapt based on widget height.
+  - **Widget C (Large — Consistency Dashboard):** 4x3/4x4 comprehensive dashboard. Shows current streak (`🔥 14 days`), all-time best streak (`🏆 21d best`), completion progress bar and percentage, up to 5 commitment rows with overflow handling, and an "Open MYC" quick-action button.
+- **Continuous Native Generation (CNG) Architecture:**
+  - Config plugin `apps/mobile/plugins/withAndroidWidgets.js` automates registration of widget receivers in `AndroidManifest.xml`, injects `MycWidgetPackage` into `MainApplication.kt`, and compiles native layouts, drawables, strings, and Kotlin providers.
+- **Shared Snapshot Storage & Zero Logic Duplication:**
+  - App and widgets communicate via private `SharedPreferences` (`myc_widget_prefs`).
+  - Zero business logic duplication: computed display state is produced in TypeScript using shared `@myc/utils` (`getDashboardConsistencyData`, `getUserLocalDateString`), adhering to user profile timezone.
+- **Security & Signed-Out Handling:**
+  - Absolutely zero raw tokens, passwords, or emails stored in widget preferences. Only minimal display attributes (title, completion boolean, streak number, date).
+  - Clean, neutral prompt displayed when signed out ("Sign in to MYC to view commitments") with tap opening `myc://auth`.
+  - Immediate purge on local or global sign-out (`signOutMobile`, `signOutAllDevicesMobile`).
+- **Real-Time Data Refresh:**
+  - Periodic background update (`updatePeriodMillis="1800000"` / 30m).
+  - Real-time foreground update on dashboard load, commitment completion, creation, edit, or delete, and AppState resume.
+- **Deep Linking:**
+  - Explicit PendingIntent navigation scheme (`myc://dashboard`, `myc://commitment/<id>?action=complete|detail`, `myc://auth`).
+  - Tapping uncompleted commitment deep links directly into the mobile app's `CompleteCommitmentModal`.
+  - Tapping completed commitment opens detail/history modal.
+  - Tapping header or empty state opens Dashboard.
 
 ---
 

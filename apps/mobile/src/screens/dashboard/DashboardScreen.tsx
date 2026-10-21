@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { getSupabase } from "@/lib/supabase";
 import { colors, radii } from "@/lib/theme";
+import { syncWidgetData } from "@/lib/widgets";
 
 const TONE_DOT_COLORS: Record<string, string> = {
   sky: "#38BDF8",
@@ -55,9 +56,15 @@ const TONE_DOT_COLORS: Record<string, string> = {
 export interface DashboardScreenProps {
   onNavigateToCalendar?: () => void;
   onNavigateToCommitments?: () => void;
+  deepLinkTarget?: { commitmentId: string; action: "complete" | "detail" } | null;
+  onClearDeepLinkTarget?: () => void;
 }
 
-export function DashboardScreen({ onNavigateToCommitments }: DashboardScreenProps) {
+export function DashboardScreen({
+  onNavigateToCommitments,
+  deepLinkTarget,
+  onClearDeepLinkTarget,
+}: DashboardScreenProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [metrics, setMetrics] = useState<ConsistencyMetrics | null>(null);
@@ -109,6 +116,9 @@ export function DashboardScreen({ onNavigateToCommitments }: DashboardScreenProp
 
         setWeekCompletions((comps as DailyCompletion[]) || []);
       }
+
+      // Sync with native home-screen widgets
+      void syncWidgetData(data.metrics, data.todayItems, userTimezone);
     } catch (err) {
       console.warn("Failed to load dashboard data:", err);
     } finally {
@@ -150,6 +160,26 @@ export function DashboardScreen({ onNavigateToCommitments }: DashboardScreenProp
       void supabase.removeChannel(commitmentsChannel);
     };
   }, [loadDashboardData]);
+
+  // Handle deep-link targets from widgets (e.g. myc://commitment/<id>?action=complete)
+  useEffect(() => {
+    if (!deepLinkTarget || allCommitments.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const target = allCommitments.find((c) => c.id === deepLinkTarget.commitmentId);
+      if (target) {
+        if (deepLinkTarget.action === "complete") {
+          setSelectedCommitment(target);
+          setCompleteModalVisible(true);
+        } else {
+          setHistoryCommitment(target);
+        }
+        onClearDeepLinkTarget?.();
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [deepLinkTarget, allCommitments, onClearDeepLinkTarget]);
 
   const handleRefresh = () => {
     setRefreshing(true);
