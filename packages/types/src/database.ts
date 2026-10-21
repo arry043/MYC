@@ -16,6 +16,7 @@ export type Database = {
           frequency: string;
           id: string;
           schedule_days: number[] | null;
+          scheduled_date: string | null;
           start_date: string;
           status: string;
           title: string;
@@ -30,6 +31,7 @@ export type Database = {
           frequency?: string;
           id?: string;
           schedule_days?: number[] | null;
+          scheduled_date?: string | null;
           start_date?: string;
           status?: string;
           title: string;
@@ -44,6 +46,7 @@ export type Database = {
           frequency?: string;
           id?: string;
           schedule_days?: number[] | null;
+          scheduled_date?: string | null;
           start_date?: string;
           status?: string;
           title?: string;

@@ -325,6 +325,38 @@ Phase 14 delivers the native Android client in `apps/mobile`:
 - **Realtime Synchronization:**
   - Subscribes to Supabase Realtime Postgres change events on `daily_completions` and `commitments`, ensuring immediate synchronization when actions happen on Web or another device.
 
+### D-32 · Single Day Commitment Frequency, Scheduling, and Notification Readiness — 2026-10-21
+
+Users can now schedule one-time commitments scheduled for a specific date (today or in the future) that never repeat:
+
+- **Data Model & Schema:**
+  - Added `scheduled_date date null` to `public.commitments`.
+  - Constrained `frequency` to `('daily', 'specific_days', 'single_day')`.
+  - Enforced check constraints:
+    - `commitments_single_day_date_check`: `frequency = 'single_day' ⇒ scheduled_date IS NOT NULL`.
+    - `commitments_single_day_schedule_days_check`: `frequency = 'single_day' ⇒ schedule_days IS NULL`.
+  - Added partial index `idx_commitments_user_scheduled_date` on `(user_id, scheduled_date)` where `frequency = 'single_day'`.
+- **Database Rules & Invariants (`check_commitment_rules`):**
+  - Past dates strictly rejected on insert/update in the user profile's local timezone.
+  - Conversion between recurring (`daily`, `specific_days`) and one-time (`single_day`) prohibited on update.
+  - Modifying the scheduled date of completed commitments prohibited.
+  - **Pre-Journey Invariant:** Future single-day commitments (`scheduled_date > user_today`) are permitted with `status = 'active'` without mutating `myc_started_at`. The official MYC journey start date is initialized only when the user confirms their first commitment due today or earlier.
+  - `confirm_first_commitment` RPC prevents starting the journey with a future single-day commitment.
+- **Completion Rules (`check_daily_completion_rules`):**
+  - Completions on single-day commitments are permitted only when `date = scheduled_date`. Duplicate completions and completion attempts for other dates are rejected server-side.
+- **Centralized Scheduling & Analytics Engine (`@myc/utils`):**
+  - `isCommitmentExpectedOnDate`: Evaluates `single_day` commitments only on their exact `scheduled_date` (or fallback `start_date`).
+  - Does not count dates before its scheduled date as missed days or expected instances.
+  - Does not distort historical streaks, consistency percentages, or daily scores.
+- **UI Parity (Web/PWA & Native Expo Android):**
+  - 3-way SegmentedControl (`Every day | Selected days | Single day`). Frequency is locked when editing to prevent accidental conversion.
+  - Native pastel month-navigation date pickers on both platforms with disabled past dates, month switcher, today shortcut, and empty/selected state messaging (no WebView).
+  - Commitment cards display `Scheduled <date>` instead of `Started <date>` for single-day commitments.
+  - Calendar Day, Week, Month, and Year views display single-day commitments on their scheduled date, with forward navigation enabled up to the maximum scheduled date (+ 1 year).
+- **Future Notification Readiness (Phase 17):**
+  - `scheduled_date` is persisted as a clean SQL `date` type (`YYYY-MM-DD`).
+  - Natural integration point for Phase 17: Scheduled background workers/cron (Supabase `pg_cron` or Edge Functions) can query `commitments WHERE frequency = 'single_day' AND scheduled_date = current_date + interval 'N days'` combined with user timezone to trigger FCM/APNs push notifications without schema changes.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.

@@ -5,7 +5,14 @@ import { CheckIcon, SparklesIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { Commitment, CommitmentFrequency, CommitmentTone, Weekday } from "@myc/types";
-import { getUserLocalDateString, VALID_TONES, validateCommitmentInput, WEEKDAYS } from "@myc/utils";
+import {
+  formatCommitmentDate,
+  formatFrequency,
+  getUserLocalDateString,
+  VALID_TONES,
+  validateCommitmentInput,
+  WEEKDAYS,
+} from "@myc/utils";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +29,8 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { createClient } from "@/lib/supabase/client";
+
+import { SingleDayDatePicker } from "./single-day-date-picker";
 
 const TONE_CLASSES: Record<CommitmentTone, { bg: string; border: string; text: string }> = {
   sky: {
@@ -69,6 +78,7 @@ export function CommitmentDialog({
   onSuccess,
 }: CommitmentDialogProps) {
   const isEditing = Boolean(commitment && commitment.status !== "draft");
+  const todayDate = getUserLocalDateString(userTimezone);
 
   const [step, setStep] = useState<"form" | "review">("form");
   const [draftId, setDraftId] = useState<string | null>(commitment?.id ?? null);
@@ -82,11 +92,31 @@ export function CommitmentDialog({
   const [scheduleDays, setScheduleDays] = useState<Weekday[]>(
     (commitment?.schedule_days as Weekday[]) || [1, 2, 3, 4, 5, 6, 7],
   );
+  const [scheduledDate, setScheduledDate] = useState<string>(commitment?.scheduled_date ?? "");
   const [tone, setTone] = useState<CommitmentTone>((commitment?.tone as CommitmentTone) || "sky");
-  const startDate = commitment?.start_date || getUserLocalDateString(userTimezone);
+  const startDate = commitment?.start_date || todayDate;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  const [prevCommitment, setPrevCommitment] = useState(commitment);
+  const [prevOpen, setPrevOpen] = useState(open);
+
+  if (commitment !== prevCommitment || open !== prevOpen) {
+    setPrevCommitment(commitment);
+    setPrevOpen(open);
+    if (open) {
+      setTitle(commitment?.title ?? "");
+      setDescription(commitment?.description ?? "");
+      setFrequency((commitment?.frequency as CommitmentFrequency) || "daily");
+      setScheduleDays((commitment?.schedule_days as Weekday[]) || [1, 2, 3, 4, 5, 6, 7]);
+      setScheduledDate(commitment?.scheduled_date ?? "");
+      setTone((commitment?.tone as CommitmentTone) || "sky");
+      setDraftId(commitment?.id ?? null);
+      setStep("form");
+      setErrors({});
+    }
+  }
 
   const toggleDay = (dayId: Weekday) => {
     setScheduleDays((prev) => {
@@ -99,20 +129,45 @@ export function CommitmentDialog({
   };
 
   const validate = () => {
-    const res = validateCommitmentInput({
-      title,
-      description: description || undefined,
-      frequency,
-      schedule_days: frequency === "specific_days" ? scheduleDays : [1, 2, 3, 4, 5, 6, 7],
-      tone,
-      start_date: startDate,
-    });
+    const res = validateCommitmentInput(
+      {
+        title,
+        description: description || undefined,
+        frequency,
+        schedule_days: frequency === "specific_days" ? scheduleDays : [1, 2, 3, 4, 5, 6, 7],
+        scheduled_date: frequency === "single_day" ? scheduledDate : null,
+        tone,
+        start_date: frequency === "single_day" ? scheduledDate : startDate,
+      },
+      userTimezone,
+    );
     setErrors(res.errors);
     return res.valid;
   };
 
   const handleNextOrSave = async () => {
     if (!validate()) return;
+
+    const commitmentPayload = {
+      title: title.trim(),
+      description: description.trim() || null,
+      frequency,
+      schedule_days:
+        frequency === "specific_days"
+          ? scheduleDays
+          : frequency === "daily"
+            ? [1, 2, 3, 4, 5, 6, 7]
+            : null,
+      scheduled_date: frequency === "single_day" ? scheduledDate : null,
+      start_date: frequency === "single_day" ? scheduledDate : startDate,
+      end_date:
+        frequency === "single_day"
+          ? scheduledDate
+          : isEditing
+            ? (commitment?.end_date ?? null)
+            : null,
+      tone,
+    };
 
     if (isFirstCommitment && step === "form") {
       setSaving(true);
@@ -127,18 +182,42 @@ export function CommitmentDialog({
         return;
       }
 
-      // Save draft commitment to database
+      // If user is scheduling a future single-day commitment before starting journey,
+      // allow creating it as active directly without starting myc_started_at prematurely.
+      if (frequency === "single_day" && scheduledDate > todayDate) {
+        const { data: created, error } = await supabase
+          .from("commitments")
+          .insert({
+            user_id: user.id,
+            ...commitmentPayload,
+            status: "active",
+          })
+          .select()
+          .single();
+
+        setSaving(false);
+        if (error || !created) {
+          setErrors({ form: error?.message || "Failed to schedule commitment." });
+          return;
+        }
+
+        toast({
+          title: "Commitment scheduled",
+          description: `"${created.title}" is scheduled for ${formatCommitmentDate(scheduledDate)}.`,
+          tone: "success",
+        });
+        onSuccess(created as Commitment);
+        onOpenChange(false);
+        return;
+      }
+
+      // Save draft commitment to database for standard "I COMMIT" confirmation
       if (!draftId) {
         const { data: createdDraft, error } = await supabase
           .from("commitments")
           .insert({
             user_id: user.id,
-            title: title.trim(),
-            description: description.trim() || null,
-            frequency,
-            schedule_days: frequency === "specific_days" ? scheduleDays : [1, 2, 3, 4, 5, 6, 7],
-            start_date: startDate,
-            tone,
+            ...commitmentPayload,
             status: "draft",
           })
           .select()
@@ -153,14 +232,7 @@ export function CommitmentDialog({
       } else {
         const { error } = await supabase
           .from("commitments")
-          .update({
-            title: title.trim(),
-            description: description.trim() || null,
-            frequency,
-            schedule_days: frequency === "specific_days" ? scheduleDays : [1, 2, 3, 4, 5, 6, 7],
-            start_date: startDate,
-            tone,
-          })
+          .update(commitmentPayload)
           .eq("id", draftId);
 
         setSaving(false);
@@ -190,13 +262,7 @@ export function CommitmentDialog({
     if (isEditing && commitment) {
       const { data: updated, error } = await supabase
         .from("commitments")
-        .update({
-          title: title.trim(),
-          description: description.trim() || null,
-          frequency,
-          schedule_days: frequency === "specific_days" ? scheduleDays : [1, 2, 3, 4, 5, 6, 7],
-          tone,
-        })
+        .update(commitmentPayload)
         .eq("id", commitment.id)
         .select()
         .single();
@@ -219,12 +285,7 @@ export function CommitmentDialog({
         .from("commitments")
         .insert({
           user_id: user.id,
-          title: title.trim(),
-          description: description.trim() || null,
-          frequency,
-          schedule_days: frequency === "specific_days" ? scheduleDays : [1, 2, 3, 4, 5, 6, 7],
-          start_date: startDate,
-          tone,
+          ...commitmentPayload,
           status: "active",
         })
         .select()
@@ -324,12 +385,28 @@ export function CommitmentDialog({
                 <Label id="commitment-frequency-label">Frequency</Label>
                 <SegmentedControl
                   aria-label="Commitment frequency"
-                  options={[
-                    { value: "daily", label: "Every day" },
-                    { value: "specific_days", label: "Selected days" },
-                  ]}
+                  options={
+                    isEditing
+                      ? commitment?.frequency === "single_day"
+                        ? [{ value: "single_day", label: "Single day" }]
+                        : [
+                            { value: "daily", label: "Every day" },
+                            { value: "specific_days", label: "Selected days" },
+                          ]
+                      : [
+                          { value: "daily", label: "Every day" },
+                          { value: "specific_days", label: "Selected days" },
+                          { value: "single_day", label: "Single day" },
+                        ]
+                  }
                   value={frequency}
-                  onValueChange={(val) => setFrequency(val as CommitmentFrequency)}
+                  onValueChange={(val) => {
+                    const newFreq = val as CommitmentFrequency;
+                    setFrequency(newFreq);
+                    if (newFreq === "single_day" && !scheduledDate) {
+                      setScheduledDate(todayDate);
+                    }
+                  }}
                 />
                 {errors.frequency && <FieldError>{errors.frequency}</FieldError>}
               </Field>
@@ -359,6 +436,25 @@ export function CommitmentDialog({
                     })}
                   </div>
                   {errors.schedule_days && <FieldError>{errors.schedule_days}</FieldError>}
+                </Field>
+              )}
+
+              {frequency === "single_day" && (
+                <Field>
+                  <Label id="schedule-date-label">Scheduled date</Label>
+                  <SingleDayDatePicker
+                    value={scheduledDate}
+                    onChange={(date) => {
+                      setScheduledDate(date);
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.scheduled_date;
+                        return copy;
+                      });
+                    }}
+                    userTimezone={userTimezone}
+                    error={errors.scheduled_date}
+                  />
                 </Field>
               )}
 
@@ -449,16 +545,16 @@ export function CommitmentDialog({
                   <div>
                     <span className="text-muted-foreground">Frequency: </span>
                     <span className="font-semibold text-foreground">
-                      {frequency === "daily"
-                        ? "Every day"
-                        : scheduleDays
-                            .map((d) => WEEKDAYS.find((w) => w.id === d)?.short)
-                            .join(", ")}
+                      {formatFrequency(frequency, scheduleDays, scheduledDate)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Start date: </span>
-                    <span className="font-semibold text-foreground">{startDate} (Today)</span>
+                    <span className="text-muted-foreground">
+                      {frequency === "single_day" ? "Scheduled date: " : "Start date: "}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {frequency === "single_day" ? scheduledDate : `${startDate} (Today)`}
+                    </span>
                   </div>
                 </div>
               </div>

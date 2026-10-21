@@ -123,24 +123,24 @@ _Planned:_ The Android widget (Task 15) as a native module/config plugin that re
 
 ## 6. Backend — Supabase
 
-| Concern        | Implementation                                                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Schema         | Only SQL migrations in `supabase/migrations/` define it ([supabase/README.md](../supabase/README.md))                                       |
-| RLS guardrail  | `ensure_rls` event trigger enables RLS on every new `public` table and fails closed                                                         |
-| Tests          | pgTAP in `supabase/tests/database/`, run with `npm run db:test` (36 tests passing)                                                          |
-| Types          | `npm run db:types` → `packages/types/src/database.ts`                                                                                       |
-| Edge Functions | `supabase/functions/` (none yet) — the only place the service-role key may be used                                                          |
-| Auth           | Supabase Auth (Email/Password + Google OAuth, linking, verification)                                                                        |
-| Profiles       | `profiles` table: timezone persistence, immutable `myc_started_at`, `ensure_profile` RPC                                                    |
-| Commitments    | `commitments` table: CRUD, lifecycle, atomic `confirm_first_commitment` RPC                                                                 |
-| Completions    | `daily_completions` table: immutable records, `complete_commitment` RPC with optional comment, RLS & statement trigger reject DELETE/UPDATE |
-| Realtime       | Enabled; subscribed on `daily_completions` across Web views (Calendar, Dashboard, Commitments) for instant multi-device sync                |
+| Concern        | Implementation                                                                                                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema         | Only SQL migrations in `supabase/migrations/` define it ([supabase/README.md](../supabase/README.md))                                                 |
+| RLS guardrail  | `ensure_rls` event trigger enables RLS on every new `public` table and fails closed                                                                   |
+| Tests          | pgTAP in `supabase/tests/database/`, run with `npm run db:test` (49 tests passing)                                                                    |
+| Types          | `npm run db:types` → `packages/types/src/database.ts`                                                                                                 |
+| Edge Functions | `supabase/functions/` (none yet) — the only place the service-role key may be used                                                                    |
+| Auth           | Supabase Auth (Email/Password + Google OAuth, linking, verification)                                                                                  |
+| Profiles       | `profiles` table: timezone persistence, immutable `myc_started_at`, `ensure_profile` RPC                                                              |
+| Commitments    | `commitments` table: CRUD, lifecycle, atomic `confirm_first_commitment` RPC, 3 frequencies (`daily`, `specific_days`, `single_day`), `scheduled_date` |
+| Completions    | `daily_completions` table: immutable records, `complete_commitment` RPC with optional comment, RLS & statement trigger reject DELETE/UPDATE           |
+| Realtime       | Enabled; subscribed on `daily_completions` across Web views (Calendar, Dashboard, Commitments) for instant multi-device sync                          |
 
 ### Data model (PRD §33)
 
 ```text
 auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first "I COMMIT", timezone)  [Implemented]
-            ├─ 1:n ─ commitments       (title, schedule/frequency, status lifecycle)           [Implemented]
+            ├─ 1:n ─ commitments       (title, frequency ['daily', 'specific_days', 'single_day'], schedule_days, scheduled_date, status lifecycle) [Implemented]
             └─ 1:n ─ daily_completions (commitment_id, date, status, comment, completed_at)    [Implemented]
                                         unique (user_id, commitment_id, date)
 ```
@@ -150,14 +150,18 @@ auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first 
   UTC-derived date, so history doesn't shift when viewed from another timezone.
 - Rules with integrity impact live in the database: `myc_started_at` is set once by the first
   "I COMMIT" via `confirm_first_commitment` RPC; direct updates are rejected by trigger
-  `tr_protect_profile_fields`; first commitment activation outside "I COMMIT" is rejected by
-  `tr_check_commitment_rules`; completions are guarded by `tr_check_daily_completion_rules`
-  which blocks future dates, dates before `myc_started_at`, inactive commitments, and unscheduled weekdays.
+  `tr_protect_profile_fields`; first recurring commitment activation outside "I COMMIT" is rejected by
+  `tr_check_commitment_rules`; future single-day commitments (`scheduled_date > user_today`) are allowed
+  as active without setting `myc_started_at` to avoid prematurely starting the user's journey;
+  completions are guarded by `tr_check_daily_completion_rules` which blocks future dates, dates before
+  `myc_started_at`, inactive commitments, unscheduled weekdays, and completions on single-day commitments on dates other than `scheduled_date`.
 - Completions are immutable: once submitted, they represent permanent historical records. Direct `UPDATE`
   and `DELETE` by authenticated/anon roles are blocked by trigger `tr_protect_daily_completion_immutability`,
   and `uncomplete_commitment` is permanently disabled.
 - Streaks and consistency are computed centrally by the pure Consistency Engine (`packages/utils/src/consistency.ts`, D-26)
   from immutable database records, ensuring identical results across Web, PWA, and Mobile.
+- **Future Notification Readiness (Phase 17):** Single-day commitments store `scheduled_date` as a clean SQL `date`.
+  Phase 17 push reminders can query `scheduled_date` in combination with `profiles.timezone` via a scheduled cron worker (Edge Function or `pg_cron`) without data model alterations.
 
 ## 7. Type flow
 

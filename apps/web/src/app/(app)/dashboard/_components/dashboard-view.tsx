@@ -12,7 +12,7 @@ import type {
   DailyCompletion,
   Profile,
 } from "@myc/types";
-import { calculateConsistencyMetrics, getDateRange } from "@myc/utils";
+import { calculateConsistencyMetrics, getDateRange, isCommitmentExpectedOnDate } from "@myc/utils";
 
 import { PageHeader, PageSection } from "@/components/layout/page-header";
 import { ColumnChart } from "@/components/progress/column-chart";
@@ -126,16 +126,8 @@ export function DashboardView({
     }
     const compsOnDate = completions.filter((c) => c.date === dateStr);
     const activeOnDate = allCommitments.filter((c) => c.status === "active");
-    const expected = activeOnDate.filter(
-      (c) =>
-        dateStr >= c.start_date &&
-        (!c.end_date || dateStr <= c.end_date) &&
-        (c.frequency === "daily" ||
-          (c.schedule_days &&
-            c.schedule_days.includes(
-              (new Date(dateStr).getDay() === 0 ? 7 : new Date(dateStr).getDay()) as
-                1 | 2 | 3 | 4 | 5 | 6 | 7,
-            ))),
+    const expected = activeOnDate.filter((c) =>
+      isCommitmentExpectedOnDate(c, dateStr, initialProfile.myc_started_at),
     );
 
     if (expected.length === 0) {

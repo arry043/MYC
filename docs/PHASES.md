@@ -40,6 +40,7 @@ PHASE 1
 ├── Fix. Immutable Completions, Notes & Realtime ✅
 ├── 13. PWA                     ✅
 ├── 14. Android App                 ✅
+├── Single Day Commitment           ✅
 ├── 15. Android Widget
 ├── 16. Cross-Platform Sync
 ├── 17. Notifications
@@ -593,6 +594,40 @@ The native Android client for MYC built using Expo SDK 57 and React Native 0.86 
   - `npm run check` passes across all monorepo packages.
   - `npm run build:web` passes.
   - `npx expo-doctor` passed with 21/21 checks passing.
+
+---
+
+# Single Day Commitment Frequency — Complete End-to-End Integration ✅
+
+Implemented a third commitment frequency, **Single Day**, across the entire MYC platform (Web/PWA, Android native app, Supabase database, consistency engine, analytics, calendar, and tests) prior to Phase 15.
+
+- **Feature Scope:**
+  - One-time planned commitments scheduled for today or any future date that never repeat.
+  - Frequency selector options: `Every day | Selected days | Single day` across Web/PWA and Android.
+  - Native pastel month-navigation calendar date picker on both platforms with disabled past dates, month switcher, today shortcut, and empty/selected state messaging (no WebView).
+  - Editing guards: Prevents accidental conversion between recurring and single-day commitments.
+- **Database & Backend Foundation:**
+  - Migrations: `20261021032908_single_day_commitments.sql`, `20261021033202_drop_old_commitments_check.sql`, `20261021033338_single_day_triggers_refine.sql`.
+  - Stored as pure `DATE` (`scheduled_date date null`), ensuring timezone stability.
+  - Constraints: `frequency IN ('daily', 'specific_days', 'single_day')`, `schedule_days IS NULL` for `single_day`, and `scheduled_date IS NOT NULL` for `single_day`.
+  - Partial index `idx_commitments_user_scheduled_date` on `(user_id, scheduled_date)` where `frequency = 'single_day'`.
+  - Triggers enforce timezone-aware past-date rejection, lock scheduled dates once completed, and allow future single-day commitments without prematurely starting the user's MYC journey (`myc_started_at` remains NULL).
+  - Completion rules enforce completions strictly on `date = scheduled_date`.
+- **Consistency Engine & Analytics (`@myc/utils`):**
+  - Centralized scheduling via `isCommitmentExpectedOnDate`: Evaluates `single_day` commitments only on their exact `scheduled_date`.
+  - Streak engine, consistency percentage, daily score, and period summaries exclude future one-time commitments from historical metrics.
+- **Calendar & Navigation Parity:**
+  - Single-day commitments appear on their scheduled date in Day, Week, Month, and Year views.
+  - Forward date navigation enabled up to the maximum scheduled date (+ 1 year).
+  - Month and Week view cards/cells for upcoming dates are interactive, linking directly to Day view.
+- **Notification Readiness:**
+  - `scheduled_date` stored cleanly as SQL `date`, ready for Phase 17 push reminders without schema changes.
+- **Verification:**
+  - 49/49 pgTAP tests pass (`npm run db:test`).
+  - 36/36 `@myc/utils` unit tests pass.
+  - `npm run check` (format check, lint, typecheck, tests) passes across all workspaces.
+  - `npm run build:web` passes (Turbopack production build).
+  - `npm run db:types:check` passes with zero schema drift.
 
 ---
 

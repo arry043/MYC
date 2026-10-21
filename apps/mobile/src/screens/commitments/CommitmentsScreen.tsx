@@ -372,7 +372,11 @@ export function CommitmentsScreen() {
                   <View style={styles.cardBody}>
                     <Text style={styles.commitmentTitle}>{commitment.title}</Text>
                     <Text style={styles.commitmentFreq}>
-                      {formatFrequency(commitment.frequency, commitment.schedule_days)}
+                      {formatFrequency(
+                        commitment.frequency,
+                        commitment.schedule_days,
+                        commitment.scheduled_date,
+                      )}
                     </Text>
                     {commitment.description ? (
                       <Text style={styles.commitmentDesc} numberOfLines={2}>
@@ -386,7 +390,9 @@ export function CommitmentsScreen() {
                     <View style={styles.startedGroup}>
                       <Calendar size={13} color={colors.mutedForeground} />
                       <Text style={styles.startedText}>
-                        Started {commitment.start_date || "2026-10-16"}
+                        {commitment.frequency === "single_day"
+                          ? `Scheduled ${commitment.scheduled_date || commitment.start_date}`
+                          : `Started ${commitment.start_date || "2026-10-16"}`}
                       </Text>
                     </View>
 
@@ -537,6 +543,7 @@ export function CommitmentsScreen() {
         visible={createModalVisible || Boolean(editingCommitment)}
         commitment={editingCommitment}
         isFirstCommitment={!hasStartedMyc}
+        timezone={profile?.timezone || "UTC"}
         onClose={() => {
           setCreateModalVisible(false);
           setEditingCommitment(null);

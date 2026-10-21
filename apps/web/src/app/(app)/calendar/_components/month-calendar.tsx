@@ -96,7 +96,7 @@ export function MonthCalendar({
 
           {days.map((day) => {
             const isSelected = day.date === selectedDate;
-            const isInteractive = !day.isFuture && !day.isPreJourney;
+            const isInteractive = !day.isPreJourney;
 
             const tooltipText = day.isFuture
               ? `${day.date}: Upcoming date`
@@ -118,7 +118,7 @@ export function MonthCalendar({
                   className={cn(
                     "flex aspect-square w-full flex-col items-start justify-between rounded-xl p-2 text-left transition-all sm:p-3",
                     day.isFuture
-                      ? "cursor-not-allowed border border-dashed border-border/60 bg-background/50 text-muted-foreground/40"
+                      ? "cursor-pointer border border-dashed border-border/60 bg-background/50 text-muted-foreground/60 hover:ring-2 hover:ring-primary/60 hover:ring-offset-2 hover:ring-offset-card"
                       : day.isPreJourney
                         ? "cursor-not-allowed border border-border/40 bg-muted/30 text-muted-foreground/30"
                         : cn(

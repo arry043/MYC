@@ -26,7 +26,7 @@ import type {
   DailyCompletion,
   Profile,
 } from "@myc/types";
-import { formatFrequency, isCommitmentExpectedOnDate } from "@myc/utils";
+import { formatCommitmentDate, formatFrequency, isCommitmentExpectedOnDate } from "@myc/utils";
 
 import { CommitmentDialog } from "@/components/commitments/commitment-dialog";
 import { CommitmentHistoryDialog } from "@/components/commitments/commitment-history-dialog";
@@ -406,7 +406,11 @@ export function CommitmentsView({
                     <div className="grid gap-1">
                       <CardTitle className="type-h3 font-semibold">{commitment.title}</CardTitle>
                       <p className="type-small font-medium text-primary">
-                        {formatFrequency(commitment.frequency, commitment.schedule_days)}
+                        {formatFrequency(
+                          commitment.frequency,
+                          commitment.schedule_days,
+                          commitment.scheduled_date,
+                        )}
                       </p>
                       {commitment.description && (
                         <p className="line-clamp-2 pt-1 type-small text-muted-foreground">
@@ -418,7 +422,9 @@ export function CommitmentsView({
                     <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-4 type-caption text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <CalendarIcon className="size-3.5" />
-                        Started {commitment.start_date}
+                        {commitment.frequency === "single_day"
+                          ? `Scheduled for ${formatCommitmentDate(commitment.scheduled_date || commitment.start_date)}`
+                          : `Started ${commitment.start_date}`}
                       </span>
 
                       <div className="flex items-center gap-2">

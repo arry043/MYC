@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Commitment, CommitmentFrequency, CommitmentTone, Weekday } from "@myc/types";
 import { VALID_TONES, validateCommitmentInput, WEEKDAYS } from "@myc/utils";
 
+import { SingleDayDatePicker } from "@/components/commitments/SingleDayDatePicker";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
@@ -16,6 +17,7 @@ export interface CommitmentFormModalProps {
   onClose: () => void;
   commitment?: Commitment | null; // null for create, object for edit
   isFirstCommitment?: boolean;
+  timezone?: string;
   onSaved?: () => void;
   onSuccess?: () => void;
 }
@@ -34,6 +36,7 @@ export function CommitmentFormModal({
   visible,
   onClose,
   commitment,
+  timezone = "UTC",
   onSaved,
   onSuccess,
 }: CommitmentFormModalProps) {
@@ -43,6 +46,7 @@ export function CommitmentFormModal({
   const [description, setDescription] = useState("");
   const [frequency, setFrequency] = useState<CommitmentFrequency>("daily");
   const [scheduleDays, setScheduleDays] = useState<Weekday[]>([1, 2, 3, 4, 5, 6, 7]);
+  const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const [tone, setTone] = useState<CommitmentTone>("sky");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,12 +62,14 @@ export function CommitmentFormModal({
       setDescription(commitment.description || "");
       setFrequency(commitment.frequency as CommitmentFrequency);
       setScheduleDays((commitment.schedule_days as Weekday[]) || [1, 2, 3, 4, 5, 6, 7]);
+      setScheduledDate(commitment.scheduled_date || commitment.start_date || null);
       setTone(commitment.tone as CommitmentTone);
     } else {
       setTitle("");
       setDescription("");
       setFrequency("daily");
       setScheduleDays([1, 2, 3, 4, 5, 6, 7]);
+      setScheduledDate(null);
       setTone("sky");
     }
     setErrors({});
@@ -79,14 +85,36 @@ export function CommitmentFormModal({
     }
   };
 
+  const frequencyOptions = isEditing
+    ? commitment?.frequency === "single_day"
+      ? [{ value: "single_day", label: "Single day" }]
+      : [
+          { value: "daily", label: "Every day" },
+          { value: "specific_days", label: "Selected days" },
+        ]
+    : [
+        { value: "daily", label: "Every day" },
+        { value: "specific_days", label: "Selected days" },
+        { value: "single_day", label: "Single day" },
+      ];
+
   const handleSave = async () => {
-    const validation = validateCommitmentInput({
-      title,
-      description,
-      frequency,
-      schedule_days: frequency === "daily" ? [1, 2, 3, 4, 5, 6, 7] : scheduleDays,
-      tone,
-    });
+    const validation = validateCommitmentInput(
+      {
+        title,
+        description,
+        frequency,
+        schedule_days:
+          frequency === "daily"
+            ? [1, 2, 3, 4, 5, 6, 7]
+            : frequency === "specific_days"
+              ? scheduleDays
+              : null,
+        scheduled_date: frequency === "single_day" ? scheduledDate : null,
+        tone,
+      },
+      timezone,
+    );
 
     if (!validation.valid) {
       setErrors(validation.errors);
@@ -111,7 +139,13 @@ export function CommitmentFormModal({
       title: title.trim(),
       description: description.trim() ? description.trim() : null,
       frequency,
-      schedule_days: frequency === "daily" ? [1, 2, 3, 4, 5, 6, 7] : scheduleDays,
+      schedule_days:
+        frequency === "daily"
+          ? [1, 2, 3, 4, 5, 6, 7]
+          : frequency === "specific_days"
+            ? scheduleDays
+            : null,
+      scheduled_date: frequency === "single_day" ? scheduledDate : null,
       tone,
     };
 
@@ -197,14 +231,43 @@ export function CommitmentFormModal({
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Frequency</Text>
           <SegmentedControl
-            options={[
-              { value: "daily", label: "Every Day" },
-              { value: "selected_days", label: "Specific Days" },
-            ]}
+            options={frequencyOptions}
             value={frequency}
-            onChange={(val) => setFrequency(val as CommitmentFrequency)}
+            onChange={(val) => {
+              const newFreq = val as CommitmentFrequency;
+              setFrequency(newFreq);
+              if (newFreq !== "single_day" && errors.scheduled_date) {
+                setErrors((prev) => {
+                  const next = { ...prev };
+                  delete next.scheduled_date;
+                  return next;
+                });
+              }
+            }}
           />
         </View>
+
+        {/* Date picker if single day */}
+        {frequency === "single_day" && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Scheduled Date</Text>
+            <SingleDayDatePicker
+              selectedDate={scheduledDate}
+              onSelectDate={(date) => {
+                setScheduledDate(date);
+                if (errors.scheduled_date) {
+                  setErrors((prev) => {
+                    const next = { ...prev };
+                    delete next.scheduled_date;
+                    return next;
+                  });
+                }
+              }}
+              timezone={timezone}
+              error={errors.scheduled_date}
+            />
+          </View>
+        )}
 
         {/* Days of week picker if specific days */}
         {frequency === "specific_days" && (

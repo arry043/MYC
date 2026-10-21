@@ -138,7 +138,11 @@ export function TodayList({
                             aria-hidden
                             className={cn("size-1.5 rounded-full", DOT_TONE[tone] || "bg-sky")}
                           />
-                          {formatFrequency(commitment.frequency, commitment.schedule_days)}
+                          {formatFrequency(
+                            commitment.frequency,
+                            commitment.schedule_days,
+                            commitment.scheduled_date,
+                          )}
                         </span>
                         {completedTime && (
                           <span className="flex items-center gap-1 font-medium text-emerald-600">

@@ -249,6 +249,11 @@ export function isCommitmentExpectedOnDate(
     return commitment.schedule_days.includes(dow);
   }
 
+  if (commitment.frequency === "single_day") {
+    const targetDate = commitment.scheduled_date || commitment.start_date;
+    return dateStr === targetDate;
+  }
+
   return false;
 }
 
@@ -1329,6 +1334,34 @@ export async function getCalendarData(
     const isPreJourney = Boolean(mycStartedAt && d < mycStartedAt);
 
     if (isFuture || isPreJourney || !mycStartedAt) {
+      let items: DailyCommitmentItem[] | undefined;
+      if (isFuture && (view === "day" || view === "week")) {
+        const scheduledCommitments =
+          filterCommitmentId === "all"
+            ? commitments.filter(
+                (c) =>
+                  c.status === "active" &&
+                  (c.frequency === "single_day"
+                    ? (c.scheduled_date || c.start_date) === d
+                    : isCommitmentExpectedOnDate(c, d, mycStartedAt || d)),
+              )
+            : commitments.filter(
+                (c) =>
+                  c.id === filterCommitmentId &&
+                  c.status === "active" &&
+                  (c.frequency === "single_day"
+                    ? (c.scheduled_date || c.start_date) === d
+                    : isCommitmentExpectedOnDate(c, d, mycStartedAt || d)),
+              );
+
+        items = scheduledCommitments.map((c) => ({
+          commitment: c,
+          isCompleted: false,
+          completedAt: null,
+          comment: null,
+        }));
+      }
+
       return {
         date: d,
         dayOfMonth,
@@ -1338,11 +1371,12 @@ export async function getCalendarData(
         isToday,
         isFuture,
         isPreJourney,
-        expected: 0,
+        expected: items ? items.length : 0,
         completed: 0,
         percentage: null,
         isConsistent: null,
         intensity: 0,
+        items,
       };
     }
 

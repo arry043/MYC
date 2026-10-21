@@ -28,6 +28,7 @@ import {
   addDays,
   formatCompletionTimeOnly,
   formatDisplayDate,
+  formatFrequency,
   formatMonthYear,
   getCalendarData,
   getWeekDateRange,
@@ -239,6 +240,15 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
     setView("day");
   };
 
+  const maxScheduledYear = Math.max(
+    currentYear + 1,
+    ...(calendarData?.commitments || [])
+      .filter((c) => c.scheduled_date)
+      .map((c) => Number(c.scheduled_date!.slice(0, 4))),
+  );
+  const maxMonthKey = `${maxScheduledYear}-12`;
+  const maxDate = `${maxScheduledYear}-12-31`;
+
   // Bounds checks
   const isPrevDisabled = () => {
     if (!mycStartedAt) return true;
@@ -257,17 +267,16 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
 
   const isNextDisabled = () => {
     if (!mycStartedAt) return true;
-    if (view === "year") return selectedYear >= currentYear;
+    if (view === "year") return selectedYear >= maxScheduledYear;
     if (view === "month") {
       const currentMonthKey = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
-      const todayMonthKey = todayDate.slice(0, 7);
-      return currentMonthKey >= todayMonthKey;
+      return currentMonthKey >= maxMonthKey;
     }
     if (view === "week") {
       const weekRange = getWeekDateRange(selectedDate);
-      return weekRange.endDate >= todayDate;
+      return weekRange.endDate >= maxDate;
     }
-    return selectedDate >= todayDate;
+    return selectedDate >= maxDate;
   };
 
   const periodLabel = () => {
@@ -538,9 +547,11 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
 
                           <View style={styles.itemMetaRow}>
                             <Text style={styles.itemFrequencyText}>
-                              {item.commitment.frequency === "daily"
-                                ? "Every day"
-                                : "Specific scheduled days"}
+                              {formatFrequency(
+                                item.commitment.frequency,
+                                item.commitment.schedule_days,
+                                item.commitment.scheduled_date,
+                              )}
                             </Text>
                             {completedTime && (
                               <View style={styles.timeTag}>
@@ -701,7 +712,7 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
           )}
 
           {calendarData?.days.map((day) => {
-            const isInteractive = !day.isFuture && !day.isPreJourney;
+            const isInteractive = !day.isPreJourney;
             const weekdayName = WEEKDAYS[day.isoWeekday - 1] ?? "Day";
             const isSelected = day.date === selectedDate;
 
@@ -795,7 +806,7 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
                 ))}
 
               {calendarData?.days.map((day) => {
-                const isInteractive = !day.isFuture && !day.isPreJourney;
+                const isInteractive = !day.isPreJourney;
                 const isSelected = day.date === selectedDate;
                 const cellBg = getIntensityColor(day.intensity);
 
@@ -878,7 +889,7 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
                     ))}
 
                   {monthDays.map((day) => {
-                    const isInteractive = !day.isFuture && !day.isPreJourney;
+                    const isInteractive = !day.isPreJourney;
                     return (
                       <Pressable
                         key={day.date}
