@@ -5,6 +5,8 @@ const {
   withAndroidManifest,
   withMainApplication,
   withDangerousMod,
+  withGradleProperties,
+  withAppBuildGradle,
   createRunOncePlugin,
 } = require("@expo/config-plugins");
 
@@ -164,9 +166,44 @@ function copyWidgetFiles(config) {
   ]);
 }
 
+function modifyGradleProperties(config) {
+  return withGradleProperties(config, (config) => {
+    const properties = config.modResults;
+    const jvmArgsProp = properties.find((p) => p.key === "org.gradle.jvmargs");
+    if (jvmArgsProp) {
+      jvmArgsProp.value = "-Xmx4096m -XX:MaxMetaspaceSize=1024m";
+    } else {
+      properties.push({
+        type: "property",
+        key: "org.gradle.jvmargs",
+        value: "-Xmx4096m -XX:MaxMetaspaceSize=1024m",
+      });
+    }
+    return config;
+  });
+}
+
+function modifyAppBuildGradle(config) {
+  return withAppBuildGradle(config, (config) => {
+    let contents = config.modResults.contents;
+    const targetSnippet =
+      "if (findProperty('bundleInDebug') == 'true') { debuggableVariants = [] }";
+    if (!contents.includes(targetSnippet)) {
+      const anchor = "react {";
+      if (contents.includes(anchor)) {
+        contents = contents.replace(anchor, `${anchor}\n    ${targetSnippet}`);
+        config.modResults.contents = contents;
+      }
+    }
+    return config;
+  });
+}
+
 function withAndroidWidgets(config) {
   config = modifyAndroidManifest(config);
   config = modifyMainApplication(config);
+  config = modifyGradleProperties(config);
+  config = modifyAppBuildGradle(config);
   config = copyWidgetFiles(config);
   return config;
 }

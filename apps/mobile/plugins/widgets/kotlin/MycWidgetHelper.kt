@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 import com.myc.app.R
@@ -76,33 +77,37 @@ object MycWidgetHelper {
         appWidgetId: Int,
         options: Bundle? = null
     ) {
-        val views = RemoteViews(context.packageName, R.layout.widget_compact)
-        val snapshot = getWidgetData(context)
+        try {
+            val views = RemoteViews(context.packageName, R.layout.widget_compact)
+            val snapshot = getWidgetData(context)
 
-        if (!snapshot.isSignedIn) {
-            views.setViewVisibility(R.id.compact_container_signed_in, View.GONE)
-            views.setViewVisibility(R.id.compact_container_signed_out, View.VISIBLE)
+            if (!snapshot.isSignedIn) {
+                views.setViewVisibility(R.id.compact_container_signed_in, View.GONE)
+                views.setViewVisibility(R.id.compact_container_signed_out, View.VISIBLE)
 
-            val authPendingIntent = createDeepLinkIntent(context, "myc://auth", 201)
-            views.setOnClickPendingIntent(R.id.widget_compact_root, authPendingIntent)
-            views.setOnClickPendingIntent(R.id.compact_container_signed_out, authPendingIntent)
-        } else {
-            views.setViewVisibility(R.id.compact_container_signed_out, View.GONE)
-            views.setViewVisibility(R.id.compact_container_signed_in, View.VISIBLE)
+                val authPendingIntent = createDeepLinkIntent(context, "myc://auth", 201)
+                views.setOnClickPendingIntent(R.id.widget_compact_root, authPendingIntent)
+                views.setOnClickPendingIntent(R.id.compact_container_signed_out, authPendingIntent)
+            } else {
+                views.setViewVisibility(R.id.compact_container_signed_out, View.GONE)
+                views.setViewVisibility(R.id.compact_container_signed_in, View.VISIBLE)
 
-            val countText = "${snapshot.todayCompleted}/${snapshot.todayExpected}"
-            val streakText = "🔥 ${snapshot.streak}d"
+                val countText = "${snapshot.todayCompleted}/${snapshot.todayExpected}"
+                val streakText = "🔥 ${snapshot.streak}d"
 
-            views.setTextViewText(R.id.compact_count, countText)
-            views.setTextViewText(R.id.compact_streak, streakText)
-            views.setProgressBar(R.id.compact_progress_bar, 100, snapshot.todayPercentage, false)
+                views.setTextViewText(R.id.compact_count, countText)
+                views.setTextViewText(R.id.compact_streak, streakText)
+                views.setProgressBar(R.id.compact_progress_bar, 100, snapshot.todayPercentage, false)
 
-            val dashPendingIntent = createDeepLinkIntent(context, "myc://dashboard", 101)
-            views.setOnClickPendingIntent(R.id.widget_compact_root, dashPendingIntent)
-            views.setOnClickPendingIntent(R.id.compact_container_signed_in, dashPendingIntent)
+                val dashPendingIntent = createDeepLinkIntent(context, "myc://dashboard", 101)
+                views.setOnClickPendingIntent(R.id.widget_compact_root, dashPendingIntent)
+                views.setOnClickPendingIntent(R.id.compact_container_signed_in, dashPendingIntent)
+            }
+
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Throwable) {
+            Log.e("MycWidgetHelper", "Failed to update compact widget $appWidgetId", e)
         }
-
-        appWidgetManager.updateAppWidget(appWidgetId, views)
     }
 
     // --- WIDGET B: STANDARD (TODAY'S COMMITMENTS) ---
@@ -112,107 +117,111 @@ object MycWidgetHelper {
         appWidgetId: Int,
         options: Bundle? = null
     ) {
-        val views = RemoteViews(context.packageName, R.layout.widget_standard)
-        val snapshot = getWidgetData(context)
+        try {
+            val views = RemoteViews(context.packageName, R.layout.widget_standard)
+            val snapshot = getWidgetData(context)
 
-        if (!snapshot.isSignedIn) {
-            views.setViewVisibility(R.id.standard_container_signed_in, View.GONE)
-            views.setViewVisibility(R.id.standard_container_signed_out, View.VISIBLE)
+            if (!snapshot.isSignedIn) {
+                views.setViewVisibility(R.id.standard_container_signed_in, View.GONE)
+                views.setViewVisibility(R.id.standard_container_signed_out, View.VISIBLE)
 
-            val authPendingIntent = createDeepLinkIntent(context, "myc://auth", 202)
-            views.setOnClickPendingIntent(R.id.widget_standard_root, authPendingIntent)
-            views.setOnClickPendingIntent(R.id.standard_btn_sign_in, authPendingIntent)
-        } else {
-            views.setViewVisibility(R.id.standard_container_signed_out, View.GONE)
-            views.setViewVisibility(R.id.standard_container_signed_in, View.VISIBLE)
-
-            // Dynamic layout adaptation based on options
-            val opts = options ?: appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140)
-            val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-
-            val maxSlots = when {
-                minHeight < 110 -> 2
-                minHeight < 150 -> 3
-                else -> 4
-            }
-
-            // Streak formatting
-            if (minWidth < 200) {
-                views.setTextViewText(R.id.standard_streak, "🔥 ${snapshot.streak}d")
-                views.setViewVisibility(R.id.standard_header_subtitle, View.GONE)
+                val authPendingIntent = createDeepLinkIntent(context, "myc://auth", 202)
+                views.setOnClickPendingIntent(R.id.widget_standard_root, authPendingIntent)
+                views.setOnClickPendingIntent(R.id.standard_btn_sign_in, authPendingIntent)
             } else {
-                views.setTextViewText(R.id.standard_streak, "🔥 ${snapshot.streak} days")
-                views.setViewVisibility(R.id.standard_header_subtitle, View.VISIBLE)
-            }
+                views.setViewVisibility(R.id.standard_container_signed_out, View.GONE)
+                views.setViewVisibility(R.id.standard_container_signed_in, View.VISIBLE)
 
-            views.setTextViewText(
-                R.id.standard_progress_badge,
-                "${snapshot.todayCompleted}/${snapshot.todayExpected}"
-            )
+                // Dynamic layout adaptation based on options
+                val opts = options ?: appWidgetManager.getAppWidgetOptions(appWidgetId)
+                val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140)
+                val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
 
-            // Header click opens Dashboard
-            val dashPendingIntent = createDeepLinkIntent(context, "myc://dashboard", 102)
-            views.setOnClickPendingIntent(R.id.standard_header, dashPendingIntent)
+                val maxSlots = when {
+                    minHeight < 110 -> 2
+                    minHeight < 150 -> 3
+                    else -> 4
+                }
 
-            val commitments = snapshot.commitments
-            if (commitments.isEmpty()) {
-                views.setViewVisibility(R.id.standard_empty_state, View.VISIBLE)
-                views.setViewVisibility(R.id.standard_commitments_container, View.GONE)
-                views.setOnClickPendingIntent(R.id.standard_empty_state, dashPendingIntent)
-            } else {
-                views.setViewVisibility(R.id.standard_empty_state, View.GONE)
-                views.setViewVisibility(R.id.standard_commitments_container, View.VISIBLE)
+                // Streak formatting
+                if (minWidth < 200) {
+                    views.setTextViewText(R.id.standard_streak, "🔥 ${snapshot.streak}d")
+                    views.setViewVisibility(R.id.standard_header_subtitle, View.GONE)
+                } else {
+                    views.setTextViewText(R.id.standard_streak, "🔥 ${snapshot.streak} days")
+                    views.setViewVisibility(R.id.standard_header_subtitle, View.VISIBLE)
+                }
 
-                val rowIds = listOf(
-                    R.id.standard_row_1 to (R.id.standard_check_1 to R.id.standard_title_1),
-                    R.id.standard_row_2 to (R.id.standard_check_2 to R.id.standard_title_2),
-                    R.id.standard_row_3 to (R.id.standard_check_3 to R.id.standard_title_3),
-                    R.id.standard_row_4 to (R.id.standard_check_4 to R.id.standard_title_4)
+                views.setTextViewText(
+                    R.id.standard_progress_badge,
+                    "${snapshot.todayCompleted}/${snapshot.todayExpected}"
                 )
 
-                for (i in 0 until 4) {
-                    val (rowId, viewsPair) = rowIds[i]
-                    val (checkId, titleId) = viewsPair
+                // Header click opens Dashboard
+                val dashPendingIntent = createDeepLinkIntent(context, "myc://dashboard", 102)
+                views.setOnClickPendingIntent(R.id.standard_header, dashPendingIntent)
 
-                    if (i < maxSlots && i < commitments.size) {
-                        val item = commitments[i]
-                        views.setViewVisibility(rowId, View.VISIBLE)
-                        views.setTextViewText(titleId, item.title)
+                val commitments = snapshot.commitments
+                if (commitments.isEmpty()) {
+                    views.setViewVisibility(R.id.standard_empty_state, View.VISIBLE)
+                    views.setViewVisibility(R.id.standard_commitments_container, View.GONE)
+                    views.setOnClickPendingIntent(R.id.standard_empty_state, dashPendingIntent)
+                } else {
+                    views.setViewVisibility(R.id.standard_empty_state, View.GONE)
+                    views.setViewVisibility(R.id.standard_commitments_container, View.VISIBLE)
 
-                        if (item.isCompleted) {
-                            views.setImageViewResource(checkId, R.drawable.widget_ic_check)
+                    val rowIds = listOf(
+                        R.id.standard_row_1 to (R.id.standard_check_1 to R.id.standard_title_1),
+                        R.id.standard_row_2 to (R.id.standard_check_2 to R.id.standard_title_2),
+                        R.id.standard_row_3 to (R.id.standard_check_3 to R.id.standard_title_3),
+                        R.id.standard_row_4 to (R.id.standard_check_4 to R.id.standard_title_4)
+                    )
+
+                    for (i in 0 until 4) {
+                        val (rowId, viewsPair) = rowIds[i]
+                        val (checkId, titleId) = viewsPair
+
+                        if (i < maxSlots && i < commitments.size) {
+                            val item = commitments[i]
+                            views.setViewVisibility(rowId, View.VISIBLE)
+                            views.setTextViewText(titleId, item.title)
+
+                            if (item.isCompleted) {
+                                views.setImageViewResource(checkId, R.drawable.widget_ic_check)
+                            } else {
+                                views.setImageViewResource(checkId, R.drawable.widget_ic_circle)
+                            }
+
+                            val action = if (item.isCompleted) "detail" else "complete"
+                            val itemPendingIntent = createDeepLinkIntent(
+                                context,
+                                "myc://commitment/${item.id}?action=$action",
+                                1000 + item.id.hashCode()
+                            )
+                            views.setOnClickPendingIntent(rowId, itemPendingIntent)
                         } else {
-                            views.setImageViewResource(checkId, R.drawable.widget_ic_circle)
+                            views.setViewVisibility(rowId, View.GONE)
                         }
+                    }
 
-                        val action = if (item.isCompleted) "detail" else "complete"
-                        val itemPendingIntent = createDeepLinkIntent(
-                            context,
-                            "myc://commitment/${item.id}?action=$action",
-                            1000 + item.id.hashCode()
+                    if (commitments.size > maxSlots) {
+                        val overflowCount = commitments.size - maxSlots
+                        views.setViewVisibility(R.id.standard_overflow, View.VISIBLE)
+                        views.setTextViewText(
+                            R.id.standard_overflow,
+                            "+$overflowCount more commitment${if (overflowCount > 1) "s" else ""} in app"
                         )
-                        views.setOnClickPendingIntent(rowId, itemPendingIntent)
+                        views.setOnClickPendingIntent(R.id.standard_overflow, dashPendingIntent)
                     } else {
-                        views.setViewVisibility(rowId, View.GONE)
+                        views.setViewVisibility(R.id.standard_overflow, View.GONE)
                     }
                 }
-
-                if (commitments.size > maxSlots) {
-                    val overflowCount = commitments.size - maxSlots
-                    views.setViewVisibility(R.id.standard_overflow, View.VISIBLE)
-                    views.setTextViewText(
-                        R.id.standard_overflow,
-                        "+$overflowCount more commitment${if (overflowCount > 1) "s" else ""} in app"
-                    )
-                    views.setOnClickPendingIntent(R.id.standard_overflow, dashPendingIntent)
-                } else {
-                    views.setViewVisibility(R.id.standard_overflow, View.GONE)
-                }
             }
-        }
 
-        appWidgetManager.updateAppWidget(appWidgetId, views)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Throwable) {
+            Log.e("MycWidgetHelper", "Failed to update standard widget $appWidgetId", e)
+        }
     }
 
     // --- WIDGET C: LARGE (CONSISTENCY DASHBOARD) ---
@@ -222,110 +231,114 @@ object MycWidgetHelper {
         appWidgetId: Int,
         options: Bundle? = null
     ) {
-        val views = RemoteViews(context.packageName, R.layout.widget_large)
-        val snapshot = getWidgetData(context)
+        try {
+            val views = RemoteViews(context.packageName, R.layout.widget_large)
+            val snapshot = getWidgetData(context)
 
-        if (!snapshot.isSignedIn) {
-            views.setViewVisibility(R.id.large_container_signed_in, View.GONE)
-            views.setViewVisibility(R.id.large_container_signed_out, View.VISIBLE)
+            if (!snapshot.isSignedIn) {
+                views.setViewVisibility(R.id.large_container_signed_in, View.GONE)
+                views.setViewVisibility(R.id.large_container_signed_out, View.VISIBLE)
 
-            val authPendingIntent = createDeepLinkIntent(context, "myc://auth", 203)
-            views.setOnClickPendingIntent(R.id.widget_large_root, authPendingIntent)
-            views.setOnClickPendingIntent(R.id.large_btn_sign_in, authPendingIntent)
-        } else {
-            views.setViewVisibility(R.id.large_container_signed_out, View.GONE)
-            views.setViewVisibility(R.id.large_container_signed_in, View.VISIBLE)
-
-            val opts = options ?: appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 220)
-            val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-
-            val maxSlots = when {
-                minHeight < 190 -> 3
-                minHeight < 240 -> 4
-                else -> 5
-            }
-
-            // Streak Badges
-            views.setTextViewText(R.id.large_current_streak, "🔥 ${snapshot.streak} days")
-            if (minWidth < 220) {
-                views.setViewVisibility(R.id.large_best_streak, View.GONE)
+                val authPendingIntent = createDeepLinkIntent(context, "myc://auth", 203)
+                views.setOnClickPendingIntent(R.id.widget_large_root, authPendingIntent)
+                views.setOnClickPendingIntent(R.id.large_btn_sign_in, authPendingIntent)
             } else {
-                views.setViewVisibility(R.id.large_best_streak, View.VISIBLE)
-                views.setTextViewText(R.id.large_best_streak, "🏆 ${snapshot.bestStreak}d best")
-            }
+                views.setViewVisibility(R.id.large_container_signed_out, View.GONE)
+                views.setViewVisibility(R.id.large_container_signed_in, View.VISIBLE)
 
-            // Progress Summary
-            views.setTextViewText(
-                R.id.large_progress_text,
-                "${snapshot.todayCompleted} of ${snapshot.todayExpected} (${snapshot.todayPercentage}%)"
-            )
-            views.setProgressBar(R.id.large_progress_bar, 100, snapshot.todayPercentage, false)
+                val opts = options ?: appWidgetManager.getAppWidgetOptions(appWidgetId)
+                val minHeight = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 220)
+                val minWidth = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
 
-            // Header & Open Button PendingIntent
-            val dashPendingIntent = createDeepLinkIntent(context, "myc://dashboard", 103)
-            views.setOnClickPendingIntent(R.id.large_header, dashPendingIntent)
-            views.setOnClickPendingIntent(R.id.large_btn_open, dashPendingIntent)
+                val maxSlots = when {
+                    minHeight < 190 -> 3
+                    minHeight < 240 -> 4
+                    else -> 5
+                }
 
-            val commitments = snapshot.commitments
-            if (commitments.isEmpty()) {
-                views.setViewVisibility(R.id.large_empty_state, View.VISIBLE)
-                views.setViewVisibility(R.id.large_commitments_container, View.GONE)
-                views.setOnClickPendingIntent(R.id.large_empty_state, dashPendingIntent)
-            } else {
-                views.setViewVisibility(R.id.large_empty_state, View.GONE)
-                views.setViewVisibility(R.id.large_commitments_container, View.VISIBLE)
+                // Streak Badges
+                views.setTextViewText(R.id.large_current_streak, "🔥 ${snapshot.streak} days")
+                if (minWidth < 220) {
+                    views.setViewVisibility(R.id.large_best_streak, View.GONE)
+                } else {
+                    views.setViewVisibility(R.id.large_best_streak, View.VISIBLE)
+                    views.setTextViewText(R.id.large_best_streak, "🏆 ${snapshot.bestStreak}d best")
+                }
 
-                val rowIds = listOf(
-                    R.id.large_row_1 to (R.id.large_check_1 to R.id.large_title_1),
-                    R.id.large_row_2 to (R.id.large_check_2 to R.id.large_title_2),
-                    R.id.large_row_3 to (R.id.large_check_3 to R.id.large_title_3),
-                    R.id.large_row_4 to (R.id.large_check_4 to R.id.large_title_4),
-                    R.id.large_row_5 to (R.id.large_check_5 to R.id.large_title_5)
+                // Progress Summary
+                views.setTextViewText(
+                    R.id.large_progress_text,
+                    "${snapshot.todayCompleted} of ${snapshot.todayExpected} (${snapshot.todayPercentage}%)"
                 )
+                views.setProgressBar(R.id.large_progress_bar, 100, snapshot.todayPercentage, false)
 
-                for (i in 0 until 5) {
-                    val (rowId, viewsPair) = rowIds[i]
-                    val (checkId, titleId) = viewsPair
+                // Header & Open Button PendingIntent
+                val dashPendingIntent = createDeepLinkIntent(context, "myc://dashboard", 103)
+                views.setOnClickPendingIntent(R.id.large_header, dashPendingIntent)
+                views.setOnClickPendingIntent(R.id.large_btn_open, dashPendingIntent)
 
-                    if (i < maxSlots && i < commitments.size) {
-                        val item = commitments[i]
-                        views.setViewVisibility(rowId, View.VISIBLE)
-                        views.setTextViewText(titleId, item.title)
+                val commitments = snapshot.commitments
+                if (commitments.isEmpty()) {
+                    views.setViewVisibility(R.id.large_empty_state, View.VISIBLE)
+                    views.setViewVisibility(R.id.large_commitments_container, View.GONE)
+                    views.setOnClickPendingIntent(R.id.large_empty_state, dashPendingIntent)
+                } else {
+                    views.setViewVisibility(R.id.large_empty_state, View.GONE)
+                    views.setViewVisibility(R.id.large_commitments_container, View.VISIBLE)
 
-                        if (item.isCompleted) {
-                            views.setImageViewResource(checkId, R.drawable.widget_ic_check)
+                    val rowIds = listOf(
+                        R.id.large_row_1 to (R.id.large_check_1 to R.id.large_title_1),
+                        R.id.large_row_2 to (R.id.large_check_2 to R.id.large_title_2),
+                        R.id.large_row_3 to (R.id.large_check_3 to R.id.large_title_3),
+                        R.id.large_row_4 to (R.id.large_check_4 to R.id.large_title_4),
+                        R.id.large_row_5 to (R.id.large_check_5 to R.id.large_title_5)
+                    )
+
+                    for (i in 0 until 5) {
+                        val (rowId, viewsPair) = rowIds[i]
+                        val (checkId, titleId) = viewsPair
+
+                        if (i < maxSlots && i < commitments.size) {
+                            val item = commitments[i]
+                            views.setViewVisibility(rowId, View.VISIBLE)
+                            views.setTextViewText(titleId, item.title)
+
+                            if (item.isCompleted) {
+                                views.setImageViewResource(checkId, R.drawable.widget_ic_check)
+                            } else {
+                                views.setImageViewResource(checkId, R.drawable.widget_ic_circle)
+                            }
+
+                            val action = if (item.isCompleted) "detail" else "complete"
+                            val itemPendingIntent = createDeepLinkIntent(
+                                context,
+                                "myc://commitment/${item.id}?action=$action",
+                                2000 + item.id.hashCode()
+                            )
+                            views.setOnClickPendingIntent(rowId, itemPendingIntent)
                         } else {
-                            views.setImageViewResource(checkId, R.drawable.widget_ic_circle)
+                            views.setViewVisibility(rowId, View.GONE)
                         }
+                    }
 
-                        val action = if (item.isCompleted) "detail" else "complete"
-                        val itemPendingIntent = createDeepLinkIntent(
-                            context,
-                            "myc://commitment/${item.id}?action=$action",
-                            2000 + item.id.hashCode()
+                    if (commitments.size > maxSlots) {
+                        val overflowCount = commitments.size - maxSlots
+                        views.setViewVisibility(R.id.large_overflow, View.VISIBLE)
+                        views.setTextViewText(
+                            R.id.large_overflow,
+                            "+$overflowCount more commitment${if (overflowCount > 1) "s" else ""} in app"
                         )
-                        views.setOnClickPendingIntent(rowId, itemPendingIntent)
+                        views.setOnClickPendingIntent(R.id.large_overflow, dashPendingIntent)
                     } else {
-                        views.setViewVisibility(rowId, View.GONE)
+                        views.setViewVisibility(R.id.large_overflow, View.GONE)
                     }
                 }
-
-                if (commitments.size > maxSlots) {
-                    val overflowCount = commitments.size - maxSlots
-                    views.setViewVisibility(R.id.large_overflow, View.VISIBLE)
-                    views.setTextViewText(
-                        R.id.large_overflow,
-                        "+$overflowCount more commitment${if (overflowCount > 1) "s" else ""} in app"
-                    )
-                    views.setOnClickPendingIntent(R.id.large_overflow, dashPendingIntent)
-                } else {
-                    views.setViewVisibility(R.id.large_overflow, View.GONE)
-                }
             }
-        }
 
-        appWidgetManager.updateAppWidget(appWidgetId, views)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Throwable) {
+            Log.e("MycWidgetHelper", "Failed to update large widget $appWidgetId", e)
+        }
     }
 }
 

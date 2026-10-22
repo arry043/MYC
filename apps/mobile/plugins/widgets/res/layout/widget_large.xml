@@ -96,7 +96,7 @@
                     android:textSize="11sp"
                     android:textStyle="bold" />
 
-                <View
+                <FrameLayout
                     android:layout_width="0dp"
                     android:layout_height="1dp"
                     android:layout_weight="1" />
@@ -123,7 +123,7 @@
         </LinearLayout>
 
         <!-- Divider -->
-        <View
+        <ImageView
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="@color/myc_border"
