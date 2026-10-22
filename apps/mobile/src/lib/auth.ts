@@ -23,7 +23,14 @@ export async function handleAuthUrl(url: string): Promise<{ ok: boolean; error?:
 
     if (params.code) {
       const { error } = await supabase.auth.exchangeCodeForSession(params.code);
-      if (error) return { ok: false, error: formatAuthError(error) };
+      if (error) {
+        // Guard against race condition where both WebBrowser and Linking listeners exchange the same code
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session) return { ok: true };
+        return { ok: false, error: formatAuthError(error) };
+      }
       return { ok: true };
     }
 
@@ -32,7 +39,13 @@ export async function handleAuthUrl(url: string): Promise<{ ok: boolean; error?:
         access_token: params.accessToken,
         refresh_token: params.refreshToken,
       });
-      if (error) return { ok: false, error: formatAuthError(error) };
+      if (error) {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session) return { ok: true };
+        return { ok: false, error: formatAuthError(error) };
+      }
       return { ok: true };
     }
 
