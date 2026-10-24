@@ -380,6 +380,25 @@ Home-screen widgets require native Android APIs (`AppWidgetProvider`, `RemoteVie
   - PendingIntent URIs match the existing mobile scheme: `myc://dashboard`, `myc://commitment/<id>?action=complete|detail`, `myc://auth`.
   - Tapping uncompleted commitment deep links directly to `CompleteCommitmentModal` in the foreground/cold-started app.
 
+### D-17 · Realtime Cross-Platform Sync and Calm Local Notifications Architecture — 2026-10-25
+
+Web, mobile app, and native home-screen widgets must display unified metrics and consistency data without latency, state drift, or aggressive notification spam.
+
+- **Unified Realtime Convergence:**
+  - Supabase Realtime channels on both `daily_completions` and `commitments` across all active screens on Web and Mobile.
+  - Web views (`DashboardView`, `CommitmentsView`, `CalendarView`) synchronize state during rendering when incoming server props update (`prevProps !== props`), preventing stale state after `router.refresh()`.
+  - Android `AppState` active event listeners re-evaluate dashboard data and refresh native home-screen widgets (`syncWidgetData`) on every foreground transition.
+  - Web `window.addEventListener("focus")` and `window.addEventListener("online")` guarantee recovery after network reconnection or tab switching.
+- **Calm, Non-Judgmental Notification Engine (`@myc/utils` & `expo-notifications`):**
+  - Notification copy generator adheres to PRD §43: zero shame, zero manipulative warnings, gentle reminders that encourage quiet reflection.
+  - Schedule rules fail closed: never schedule reminders if 0 commitments are expected today or if all commitments are already completed.
+  - Android uses `expo-notifications` with local recurring daily alarms registered to the `myc-reminders` channel with gentle importance and soft vibration, removing external server dependencies for MVP.
+  - Deep links inside notifications (`myc://dashboard`) open the app directly to the daily dashboard.
+  - All local scheduled alarms are cancelled immediately on sign-out (`clearNotificationsAsync`).
+- **Database Notification Preferences (`notification_preferences`):**
+  - Table with owner-only RLS policies, regex check constraints for 24h `HH:MM` time formats, and immutability trigger.
+  - Settings UI on both Web (`NotificationSettingsSection`) and Android (`SettingsScreen`) with master and granular toggles.
+
 ## Open questions
 
 Decide these before (or during) the task that needs them, then move each into the log above.

@@ -48,11 +48,20 @@ export function DashboardView({
   const [todayItems, setTodayItems] = useState<DailyCommitmentItem[]>(initialTodayItems);
   const [completions, setCompletions] = useState<DailyCompletion[]>(allCompletions);
 
+  // Sync state during rendering when server re-renders with fresh data
+  const [prevInitialMetrics, setPrevInitialMetrics] = useState(initialMetrics);
+  if (initialMetrics !== prevInitialMetrics) {
+    setPrevInitialMetrics(initialMetrics);
+    setMetrics(initialMetrics);
+    setTodayItems(initialTodayItems);
+    setCompletions(allCompletions);
+  }
+
   // Realtime subscription for cross-device sync
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel("dashboard:daily_completions")
+      .channel("web:dashboard:sync")
       .on(
         "postgres_changes",
         {
@@ -64,9 +73,29 @@ export function DashboardView({
           router.refresh();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "commitments",
+        },
+        () => {
+          router.refresh();
+        },
+      )
       .subscribe();
 
+    const handleSync = () => {
+      router.refresh();
+    };
+
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("online", handleSync);
+
     return () => {
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("online", handleSync);
       supabase.removeChannel(channel);
     };
   }, [router]);

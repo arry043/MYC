@@ -1,4 +1,5 @@
 import type { User } from "@supabase/supabase-js";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
@@ -8,6 +9,7 @@ import { AppHeader } from "@/components/layout/AppHeader";
 import { BottomNav, type TabKey } from "@/components/layout/BottomNav";
 import { ScreenTransition } from "@/components/shared/Motion";
 import { setupMobileAuth, signOutMobile } from "@/lib/auth";
+import { clearNotificationsAsync, setupNotificationChannelAsync } from "@/lib/notifications";
 import { colors } from "@/lib/theme";
 import { clearWidgets } from "@/lib/widgets";
 import { AnalyticsScreen } from "@/screens/analytics/AnalyticsScreen";
@@ -74,13 +76,24 @@ export default function App() {
       handleUrl(initialUrl);
     });
 
+    void setupNotificationChannelAsync();
+
+    const notifSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const url = response.notification.request.content.data?.url as string | undefined;
+      if (url) {
+        handleUrl(url);
+      }
+    });
+
     return () => {
       sub.remove();
+      notifSub.remove();
     };
   }, []);
 
   const handleSignOut = async () => {
     await clearWidgets();
+    await clearNotificationsAsync();
     await signOutMobile();
     setCurrentUser(null);
     setActiveScreen("dashboard");

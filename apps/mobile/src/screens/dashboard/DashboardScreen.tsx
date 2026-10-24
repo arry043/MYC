@@ -11,7 +11,15 @@ import {
   Trophy,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  AppState,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import type {
   AnalyticsChartPoint,
@@ -154,8 +162,15 @@ export function DashboardScreen({
       })
       .subscribe();
 
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void loadDashboardData();
+      }
+    });
+
     return () => {
       isMounted = false;
+      appStateSub.remove();
       void supabase.removeChannel(completionsChannel);
       void supabase.removeChannel(commitmentsChannel);
     };
