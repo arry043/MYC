@@ -67,7 +67,7 @@ export function CalendarView({ initialData }: CalendarViewProps) {
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel("calendar:daily_completions")
+      .channel("web:calendar:sync")
       .on(
         "postgres_changes",
         {
@@ -79,9 +79,29 @@ export function CalendarView({ initialData }: CalendarViewProps) {
           router.refresh();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "commitments",
+        },
+        () => {
+          router.refresh();
+        },
+      )
       .subscribe();
 
+    const handleSync = () => {
+      router.refresh();
+    };
+
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("online", handleSync);
+
     return () => {
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("online", handleSync);
       supabase.removeChannel(channel);
     };
   }, [router]);

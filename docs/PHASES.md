@@ -42,8 +42,8 @@ PHASE 1
 ├── 14. Android App                 ✅
 ├── Single Day Commitment           ✅
 ├── 15. Android Widget              ✅
-├── 16. Cross-Platform Sync
-├── 17. Notifications
+├── 16. Cross-Platform Sync         ✅
+├── 17. Notifications               ✅
 ├── 18. Security & Edge Cases
 └── 19. Phase 1 Testing & Release
 ```
@@ -676,51 +676,46 @@ Implemented production-ready, native Android home-screen widgets for MYC (Make Y
 
 ---
 
-# 16 — Cross-Platform Sync
+# 16 — Cross-Platform Sync ✅
 
-Test this properly.
+Implemented seamless multi-platform data convergence across Web, Android, and Android home-screen widgets:
 
-Example:
-
-```text
-Web
- ↓
-Complete DSA
- ↓
-Supabase
- ↓
-Android
- ↓
-Widget updates
-```
-
-And:
-
-```text
-Android Widget
- ↓
-Complete DSA
- ↓
-Supabase
- ↓
-Web updates
-```
-
-This is where MYC starts feeling like a real ecosystem.
+- **Web → Android → Widget:**
+  - Completions on Web are committed to Supabase `daily_completions`.
+  - Android application listens via Supabase Realtime (`daily_completions` and `commitments` channels).
+  - Mobile refreshes state and updates the private native widget snapshot (`syncWidgetData`).
+  - Home-screen widgets (Compact, Standard, Large) display the updated completion ratios and streaks.
+- **Android / Widget → Web:**
+  - In-app completions or widget deep-link completion actions (`myc://commitment/<id>?action=complete`) submit immutable completion records.
+  - Native widgets update immediately.
+  - Web screens (`dashboard`, `commitments`, `calendar`) receive Postgres changes via Supabase Realtime and re-render server state with render-time prop synchronization.
+- **Resilience & Background Recovery:**
+  - Android `AppState` active listener refetches dashboard and commitments on foreground resume.
+  - Web `window.addEventListener("focus")` and `window.addEventListener("online")` guarantee recovery from network disconnects or dormant browser tabs.
+  - Session sign-out triggers immediate widget reset (`clearWidgets()`) with zero token leakage.
 
 ---
 
-# 17 — Notifications
+# 17 — Notifications ✅
 
-Optional for early MVP, but good Phase-1 addition.
+Production-ready, calm, non-judgmental consistency reminders adhering to PRD §43:
 
-Implement:
-
-- Daily reminder
-- Incomplete commitments reminder
-- Streak reminder
-
-Avoid aggressive/guilt-based messaging.
+- **Schema & RLS:**
+  - Migration `20261025003500_notification_preferences.sql` creating `public.notification_preferences`.
+  - Check constraints for 24-hour time strings (`^([01][0-9]|2[0-3]):[0-5][0-9]$`).
+  - Owner-only RLS policies with field immutability trigger and comprehensive pgTAP tests.
+- **Notification Types:**
+  - **Daily check-in reminder:** Morning prompt to reflect and focus on today's commitments.
+  - **Incomplete commitments reminder:** Evening reminder triggered only if scheduled commitments remain open.
+  - **Streak encouragement reminder:** Non-threatening motivation to keep momentum alive.
+- **Platforms:**
+  - **Android:** Native scheduled local notifications via `expo-notifications`, Android 8+ notification channel `myc-reminders` with gentle priority, and notification response listener deep-linking to `myc://dashboard`.
+  - **Web:** Browser permission requests with graceful unsupported/blocked status banners and real-time settings persistence.
+- **User Controls:**
+  - Master toggle + individual reminder toggles.
+  - Configurable reminder times (`07:00` through `22:00`).
+  - Settings UI in both Web (`NotificationSettingsSection`) and Android (`SettingsScreen`).
+  - Immediate notification cancellation on sign-out (`clearNotificationsAsync`).
 
 ---
 

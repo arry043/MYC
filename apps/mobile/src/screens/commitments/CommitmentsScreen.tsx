@@ -15,6 +15,7 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  AppState,
   Modal as RNModal,
   Pressable,
   RefreshControl,
@@ -112,62 +113,41 @@ export function CommitmentsScreen() {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchCommitments = async () => {
-      try {
-        const supabase = getSupabase();
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) return;
-
-        const [profileRes, commitmentsRes] = await Promise.all([
-          supabase.from("profiles").select("*").eq("user_id", user.id).single(),
-          supabase
-            .from("commitments")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: true }),
-        ]);
-
-        if (isMounted) {
-          if (profileRes.data) {
-            setProfile(profileRes.data as Profile);
-          }
-          if (commitmentsRes.data) {
-            setCommitments(commitmentsRes.data as Commitment[]);
-          }
-        }
-
-        const today = getUserLocalDateString(profileRes.data?.timezone);
-        const { data: completionsData } = await supabase
-          .from("daily_completions")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("date", today);
-
-        if (isMounted) {
-          if (completionsData) {
-            setTodayCompletions(completionsData as DailyCompletion[]);
-          }
-          setLoading(false);
-          setRefreshing(false);
-        }
-      } catch (err) {
-        console.error("Failed to load commitments:", err);
-        if (isMounted) {
-          setLoading(false);
-          setRefreshing(false);
-        }
+    const fetchInitial = async () => {
+      if (isMounted) {
+        await loadData();
       }
     };
+    void fetchInitial();
 
-    void fetchCommitments();
+    const supabase = getSupabase();
+    const completionsChannel = supabase
+      .channel("mobile:commitments:daily_completions")
+      .on("postgres_changes", { event: "*", schema: "public", table: "daily_completions" }, () => {
+        void loadData();
+      })
+      .subscribe();
+
+    const commitmentsChannel = supabase
+      .channel("mobile:commitments:commitments")
+      .on("postgres_changes", { event: "*", schema: "public", table: "commitments" }, () => {
+        void loadData();
+      })
+      .subscribe();
+
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void loadData();
+      }
+    });
 
     return () => {
       isMounted = false;
+      appStateSub.remove();
+      void supabase.removeChannel(completionsChannel);
+      void supabase.removeChannel(commitmentsChannel);
     };
-  }, []);
+  }, [loadData]);
 
   // Realtime subscription
   useEffect(() => {

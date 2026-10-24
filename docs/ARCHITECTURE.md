@@ -139,10 +139,11 @@ _Planned:_ The Android widget (Task 15) as a native module/config plugin that re
 ### Data model (PRD §33)
 
 ```text
-auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first "I COMMIT", timezone)  [Implemented]
-            ├─ 1:n ─ commitments       (title, frequency ['daily', 'specific_days', 'single_day'], schedule_days, scheduled_date, status lifecycle) [Implemented]
-            └─ 1:n ─ daily_completions (commitment_id, date, status, comment, completed_at)    [Implemented]
-                                        unique (user_id, commitment_id, date)
+auth.users ─┬─ 1:1 ─ profiles                 (myc_started_at NULL until first "I COMMIT", timezone)  [Implemented]
+            ├─ 1:1 ─ notification_preferences (enabled, daily/incomplete/streak flags, reminder times) [Implemented]
+            ├─ 1:n ─ commitments              (title, frequency ['daily', 'specific_days', 'single_day'], schedule_days, scheduled_date, status lifecycle) [Implemented]
+            └─ 1:n ─ daily_completions        (commitment_id, date, status, comment, completed_at)    [Implemented]
+                                               unique (user_id, commitment_id, date)
 ```
 
 - Every table carries `user_id` and owner-only RLS policies.
@@ -160,8 +161,10 @@ auth.users ─┬─ 1:1 ─ profiles          (myc_started_at NULL until first 
   and `uncomplete_commitment` is permanently disabled.
 - Streaks and consistency are computed centrally by the pure Consistency Engine (`packages/utils/src/consistency.ts`, D-26)
   from immutable database records, ensuring identical results across Web, PWA, and Mobile.
-- **Future Notification Readiness (Phase 17):** Single-day commitments store `scheduled_date` as a clean SQL `date`.
-  Phase 17 push reminders can query `scheduled_date` in combination with `profiles.timezone` via a scheduled cron worker (Edge Function or `pg_cron`) without data model alterations.
+- **Cross-Platform Sync & Notifications (Phases 16 & 17):**
+  - Supabase Realtime enables immediate state propagation across Web and Mobile on both `daily_completions` and `commitments`.
+  - Android home-screen widgets automatically refresh from the updated local snapshot on mobile foreground resume and completion actions.
+  - Notification preferences (`notification_preferences`) store master and granular reminder settings with regex constraints on 24h `HH:MM` time formats. Local recurring reminders on Android run via `expo-notifications` on the `myc-reminders` channel with zero third-party push server dependencies. All scheduled reminders are wiped on sign-out.
 
 ## 7. Type flow
 

@@ -88,11 +88,22 @@ export function CommitmentsView({
   const hasStartedMyc = Boolean(profile?.myc_started_at);
   const isFirstCommitmentFlow = !hasStartedMyc;
 
+  // Sync state during rendering when server re-renders with fresh data
+  const [prevInitialCommitments, setPrevInitialCommitments] = useState(initialCommitments);
+  if (initialCommitments !== prevInitialCommitments) {
+    setPrevInitialCommitments(initialCommitments);
+    setCommitments(initialCommitments);
+    setProfile(initialProfile);
+    if (initialTodayCompletions) {
+      setTodayCompletions(initialTodayCompletions);
+    }
+  }
+
   // Realtime subscription for cross-device sync
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
-      .channel("commitments:daily_completions")
+      .channel("web:commitments:sync")
       .on(
         "postgres_changes",
         {
@@ -104,9 +115,29 @@ export function CommitmentsView({
           router.refresh();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "commitments",
+        },
+        () => {
+          router.refresh();
+        },
+      )
       .subscribe();
 
+    const handleSync = () => {
+      router.refresh();
+    };
+
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("online", handleSync);
+
     return () => {
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("online", handleSync);
       supabase.removeChannel(channel);
     };
   }, [router]);

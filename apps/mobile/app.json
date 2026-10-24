@@ -24,7 +24,14 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-web-browser",
-      "./plugins/withAndroidWidgets"
+      "./plugins/withAndroidWidgets",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#0284c7"
+        }
+      ]
     ]
   }
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  AppState,
   Modal as RNModal,
   Pressable,
   RefreshControl,
@@ -129,11 +130,11 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
     };
   }, [view, selectedDate, selectedYear, selectedMonth, filterCommitmentId]);
 
-  // Real-time subscription for completions
+  // Real-time subscription for completions and commitments sync
   useEffect(() => {
     const supabase = getSupabase();
     const channel = supabase
-      .channel("calendar:completions")
+      .channel("mobile:calendar:sync")
       .on(
         "postgres_changes",
         {
@@ -145,10 +146,28 @@ export function CalendarScreen({ onNavigateToCommitments }: CalendarScreenProps)
           void loadData();
         },
       )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "commitments",
+        },
+        () => {
+          void loadData();
+        },
+      )
       .subscribe();
 
+    const appStateSub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void loadData();
+      }
+    });
+
     return () => {
-      supabase.removeChannel(channel);
+      appStateSub.remove();
+      void supabase.removeChannel(channel);
     };
   }, [loadData]);
 

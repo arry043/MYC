@@ -161,3 +161,15 @@ export interface AnalyticsPageData {
   reportingPeriod: AnalyticsReportingPeriod;
   error?: string | null;
 }
+
+export type NotificationPreferences = Tables<"notification_preferences">;
+
+export interface UpdateNotificationPreferencesInput {
+  enabled?: boolean;
+  daily_reminder_enabled?: boolean;
+  daily_reminder_time?: string;
+  incomplete_reminder_enabled?: boolean;
+  incomplete_reminder_time?: string;
+  streak_reminder_enabled?: boolean;
+  push_token?: string | null;
+}

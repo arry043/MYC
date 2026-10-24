@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import type { NotificationPreferences } from "@myc/types";
 import {
   canUnlinkProvider,
   extractAuthIdentities,
@@ -26,6 +27,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { signInWithGoogleMobile, signOutAllDevicesMobile, signOutMobile } from "@/lib/auth";
+import {
+  checkNotificationPermissionsAsync,
+  fetchNotificationPreferencesAsync,
+  requestNotificationPermissionsAsync,
+  saveNotificationPreferencesAsync,
+} from "@/lib/notifications";
 import { getSupabase } from "@/lib/supabase";
 import { colors, radii, shadows } from "@/lib/theme";
 
@@ -54,8 +61,15 @@ function GoogleIcon({ size = 20 }: { size?: number }) {
 
 const REMINDER_TIMES = [
   { value: "07:00", label: "7:00 AM" },
+  { value: "08:00", label: "8:00 AM" },
+  { value: "09:00", label: "9:00 AM" },
+  { value: "12:00", label: "12:00 PM" },
+  { value: "18:00", label: "6:00 PM" },
+  { value: "19:00", label: "7:00 PM" },
   { value: "20:00", label: "8:00 PM" },
+  { value: "21:00", label: "9:00 PM" },
   { value: "21:30", label: "9:30 PM" },
+  { value: "22:00", label: "10:00 PM" },
 ];
 
 export interface SettingsScreenProps {
@@ -68,11 +82,11 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Reminders state
-  const [dailyReminder, setDailyReminder] = useState(true);
-  const [unfinishedReminder, setUnfinishedReminder] = useState(false);
-  const [reminderTime, setReminderTime] = useState("20:00");
+  // Notification Preferences state
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences | null>(null);
+  const [permissionGranted, setPermissionGranted] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [timePickerTarget, setTimePickerTarget] = useState<"daily" | "incomplete">("daily");
 
   // Change password modal
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -88,6 +102,12 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
         data: { user },
       } = await supabase.auth.getUser();
       setCurrentUser(user);
+      if (user) {
+        const prefs = await fetchNotificationPreferencesAsync(supabase, user.id);
+        setNotifPrefs(prefs);
+        const permitted = await checkNotificationPermissionsAsync();
+        setPermissionGranted(permitted);
+      }
     } catch (err) {
       console.error("Failed to load user in settings:", err);
     } finally {
@@ -105,6 +125,16 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
         } = await supabase.auth.getUser();
         if (isMounted) {
           setCurrentUser(user);
+          if (user) {
+            const prefs = await fetchNotificationPreferencesAsync(supabase, user.id);
+            if (isMounted) {
+              setNotifPrefs(prefs);
+            }
+            const permitted = await checkNotificationPermissionsAsync();
+            if (isMounted) {
+              setPermissionGranted(permitted);
+            }
+          }
           setLoading(false);
         }
       } catch (err) {
@@ -121,6 +151,43 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
       isMounted = false;
     };
   }, []);
+
+  const handleUpdatePreference = async (patch: Partial<NotificationPreferences>) => {
+    if (!currentUser || !notifPrefs) return;
+
+    // If enabling master toggle or any reminder, ensure notification permission
+    if (
+      patch.enabled === true ||
+      (notifPrefs.enabled &&
+        (patch.daily_reminder_enabled === true || patch.incomplete_reminder_enabled === true))
+    ) {
+      if (!permissionGranted) {
+        const granted = await requestNotificationPermissionsAsync();
+        setPermissionGranted(granted);
+        if (!granted) {
+          Alert.alert(
+            "Notifications Disabled",
+            "Please enable notifications for MYC in your device settings to receive consistency reminders.",
+          );
+        }
+      }
+    }
+
+    const optimistic = { ...notifPrefs, ...patch };
+    setNotifPrefs(optimistic);
+
+    try {
+      const supabase = getSupabase();
+      const saved = await saveNotificationPreferencesAsync(supabase, currentUser.id, patch);
+      if (saved) {
+        setNotifPrefs(saved);
+      }
+    } catch (err) {
+      console.error("Failed to update notification preference:", err);
+      Alert.alert("Error", "Could not save reminder preference. Please try again.");
+      setNotifPrefs(notifPrefs);
+    }
+  };
 
   const identitiesSummary = extractAuthIdentities(currentUser);
 
@@ -299,8 +366,16 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
     );
   };
 
-  const selectedReminderLabel =
-    REMINDER_TIMES.find((t) => t.value === reminderTime)?.label || "8:00 PM";
+  const isMasterEnabled = Boolean(notifPrefs?.enabled);
+  const dailyEnabled = Boolean(notifPrefs?.daily_reminder_enabled);
+  const dailyTime = notifPrefs?.daily_reminder_time || "09:00";
+  const incompleteEnabled = Boolean(notifPrefs?.incomplete_reminder_enabled);
+  const incompleteTime = notifPrefs?.incomplete_reminder_time || "20:00";
+  const streakEnabled = Boolean(notifPrefs?.streak_reminder_enabled);
+
+  const dailyTimeLabel = REMINDER_TIMES.find((t) => t.value === dailyTime)?.label || dailyTime;
+  const incompleteTimeLabel =
+    REMINDER_TIMES.find((t) => t.value === incompleteTime)?.label || incompleteTime;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -328,51 +403,143 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
               </Text>
             </View>
 
-            {/* Daily reminder switch row */}
+            {/* Master Switch Row */}
             <View style={styles.switchRow}>
               <View style={styles.switchTextGroup}>
-                <Text style={styles.switchLabel}>Daily reminder</Text>
-                <Text style={styles.switchHint}>A short note at the time you choose.</Text>
+                <Text style={styles.switchLabel}>Allow reminders</Text>
+                <Text style={styles.switchHint}>Enable consistency check-ins on this device.</Text>
               </View>
               <Switch
-                value={dailyReminder}
-                onValueChange={setDailyReminder}
+                value={isMasterEnabled}
+                onValueChange={(val) => void handleUpdatePreference({ enabled: val })}
                 trackColor={{ false: "#E2E8F0", true: colors.primary }}
                 thumbColor="#FFFFFF"
               />
             </View>
 
-            <View style={styles.separator} />
-
-            {/* Unfinished commitments switch row */}
-            <View style={styles.switchRow}>
-              <View style={styles.switchTextGroup}>
-                <Text style={styles.switchLabel}>Unfinished commitments</Text>
-                <Text style={styles.switchHint}>
-                  Only if something is still open late in the day.
-                </Text>
+            {/* Warning if notifications are blocked in Android settings */}
+            {isMasterEnabled && !permissionGranted && (
+              <View style={styles.permissionAlert}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.permissionAlertTitle}>Notifications blocked</Text>
+                  <Text style={styles.permissionAlertText}>
+                    MYC needs notification permission to send reminders.
+                  </Text>
+                </View>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onPress={async () => {
+                    const granted = await requestNotificationPermissionsAsync();
+                    setPermissionGranted(granted);
+                  }}
+                >
+                  <Text style={styles.btnTextSecondary}>Allow</Text>
+                </Button>
               </View>
-              <Switch
-                value={unfinishedReminder}
-                onValueChange={setUnfinishedReminder}
-                trackColor={{ false: "#E2E8F0", true: colors.primary }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
+            )}
 
-            <View style={styles.separator} />
+            {isMasterEnabled && (
+              <>
+                <View style={styles.separator} />
 
-            {/* Reminder time select row */}
-            <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>Reminder time</Text>
-              <Pressable
-                style={({ pressed }) => [styles.selectBox, pressed && styles.selectBoxPressed]}
-                onPress={() => setTimePickerVisible(true)}
-              >
-                <Text style={styles.selectValueText}>{selectedReminderLabel}</Text>
-                <ChevronsUpDown size={16} color={colors.mutedForeground} />
-              </Pressable>
-            </View>
+                {/* Daily Check-in */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchTextGroup}>
+                    <Text style={styles.switchLabel}>Daily check-in</Text>
+                    <Text style={styles.switchHint}>
+                      A short morning note for today&apos;s commitments.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={dailyEnabled}
+                    onValueChange={(val) =>
+                      void handleUpdatePreference({ daily_reminder_enabled: val })
+                    }
+                    trackColor={{ false: "#E2E8F0", true: colors.primary }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                {dailyEnabled && (
+                  <View style={[styles.fieldGroup, { marginTop: -4 }]}>
+                    <Text style={styles.fieldLabel}>Check-in time</Text>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.selectBox,
+                        pressed && styles.selectBoxPressed,
+                      ]}
+                      onPress={() => {
+                        setTimePickerTarget("daily");
+                        setTimePickerVisible(true);
+                      }}
+                    >
+                      <Text style={styles.selectValueText}>{dailyTimeLabel}</Text>
+                      <ChevronsUpDown size={16} color={colors.mutedForeground} />
+                    </Pressable>
+                  </View>
+                )}
+
+                <View style={styles.separator} />
+
+                {/* Incomplete commitments reminder */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchTextGroup}>
+                    <Text style={styles.switchLabel}>Incomplete commitments</Text>
+                    <Text style={styles.switchHint}>
+                      Only sent if something is still open later in the day.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={incompleteEnabled}
+                    onValueChange={(val) =>
+                      void handleUpdatePreference({ incomplete_reminder_enabled: val })
+                    }
+                    trackColor={{ false: "#E2E8F0", true: colors.primary }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+
+                {incompleteEnabled && (
+                  <View style={[styles.fieldGroup, { marginTop: -4 }]}>
+                    <Text style={styles.fieldLabel}>Evening reminder time</Text>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.selectBox,
+                        pressed && styles.selectBoxPressed,
+                      ]}
+                      onPress={() => {
+                        setTimePickerTarget("incomplete");
+                        setTimePickerVisible(true);
+                      }}
+                    >
+                      <Text style={styles.selectValueText}>{incompleteTimeLabel}</Text>
+                      <ChevronsUpDown size={16} color={colors.mutedForeground} />
+                    </Pressable>
+                  </View>
+                )}
+
+                <View style={styles.separator} />
+
+                {/* Streak encouragement */}
+                <View style={styles.switchRow}>
+                  <View style={styles.switchTextGroup}>
+                    <Text style={styles.switchLabel}>Streak encouragement</Text>
+                    <Text style={styles.switchHint}>
+                      Supportive momentum reminders when you have open commitments.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={streakEnabled}
+                    onValueChange={(val) =>
+                      void handleUpdatePreference({ streak_reminder_enabled: val })
+                    }
+                    trackColor={{ false: "#E2E8F0", true: colors.primary }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+              </>
+            )}
           </Card>
 
           {/* 2. Account & Security Card */}
@@ -570,15 +737,22 @@ export function SettingsScreen({ onSignOut }: SettingsScreenProps) {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setTimePickerVisible(false)}>
           <View style={styles.timePickerCard} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalHeaderTitle}>Select reminder time</Text>
+            <Text style={styles.modalHeaderTitle}>
+              {timePickerTarget === "daily" ? "Daily check-in time" : "Evening reminder time"}
+            </Text>
             {REMINDER_TIMES.map((time) => {
-              const isSelected = reminderTime === time.value;
+              const currentTime = timePickerTarget === "daily" ? dailyTime : incompleteTime;
+              const isSelected = currentTime === time.value;
               return (
                 <Pressable
                   key={time.value}
                   style={[styles.timeOptionRow, isSelected && styles.timeOptionRowActive]}
                   onPress={() => {
-                    setReminderTime(time.value);
+                    if (timePickerTarget === "daily") {
+                      void handleUpdatePreference({ daily_reminder_time: time.value });
+                    } else {
+                      void handleUpdatePreference({ incomplete_reminder_time: time.value });
+                    }
                     setTimePickerVisible(false);
                   }}
                 >
@@ -769,6 +943,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: colors.foreground,
+  },
+  permissionAlert: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FEF3C7",
+    borderRadius: radii.lg,
+    padding: 12,
+    marginTop: 10,
+    gap: 12,
+  },
+  permissionAlertTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#92400E",
+  },
+  permissionAlertText: {
+    fontSize: 12,
+    color: "#B45309",
+    lineHeight: 16,
   },
   selectBox: {
     flexDirection: "row",
